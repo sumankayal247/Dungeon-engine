@@ -151,6 +151,7 @@
     </div>
 
     <textarea id="json" spellcheck="false" placeholder="Paste a level JSON here (it auto-formats)…"></textarea>
+    <div class="row"><button id="btnRandom">🎲 RANDOMIZE</button></div>
     <div id="msg"></div>
 
     <div style="flex:1 1 auto"></div>
@@ -1243,6 +1244,12 @@ function loadSample(){ document.getElementById('json').value=JSON.stringify(SAMP
 
 /* ---- wiring ---- */
 document.getElementById('btnPlay').onclick=buildAndPlay;
+document.getElementById('btnRandom').onclick=()=>{
+  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ toast('Fix the JSON first — '+e.message,'err',3600); return; }
+  document.getElementById('json').value=JSON.stringify(randomizeLevel(obj),null,2);
+  buildAndPlay();
+  toast('🎲 Randomized — same layout, fresh enemies & loot ✓','ok',3000);
+};
 document.getElementById('pmResume').onclick=togglePause;
 document.getElementById('pmRestart').onclick=restart;
 document.getElementById('pmSample').onclick=loadSample;
@@ -1295,6 +1302,41 @@ function loadFromHash(){
     toast('🔗 Loaded a shared dungeon ✓','ok',3200);
     return true;
   }catch(e){ toast('Share link looked corrupted — loading the sample.','err',3600); return false; }
+}
+
+/* ============================ RANDOMIZER ============================ */
+// Low-risk "remix": keep walls / start / exit, shuffle enemy types, powerup types,
+// weapon pickups & starting weapon, and only nudge positions to spots clear of walls.
+const RND_ENEMIES  = ['grunt','grunt','runner','runner','brute','sentry','turret','mage','bomber','splitter','dasher']; // weighted, no boss
+const RND_POWERUPS = ['health','health','shield','speed','damage','ammo'];
+const RND_WEAPONS  = ['smg','shotgun','sniper'];
+const rndPick = a => a[Math.floor(Math.random()*a.length)];
+function clearOfWalls(walls,x,y,r){
+  if(x<r||y<r||x>WORLD-r||y>WORLD-r) return false;
+  for(const s of walls){ if(distToSeg(x,y,s[0][0],s[0][1],s[1][0],s[1][1]) < r+WALL_THICK/2+4) return false; }
+  return true;
+}
+function jitterPos(walls,pos,r){            // try a few nearby spots; keep original if none are clear
+  const p = Array.isArray(pos)?pos:[500,500];
+  for(let i=0;i<10;i++){ const nx=p[0]+(Math.random()*2-1)*90, ny=p[1]+(Math.random()*2-1)*90;
+    if(clearOfWalls(walls,nx,ny,r)) return [Math.round(nx),Math.round(ny)]; }
+  return p.slice();
+}
+function randomizeLevel(o){
+  const L = JSON.parse(JSON.stringify(o));
+  const walls = Array.isArray(L.walls) ? L.walls : [];
+  if(L.weapons) L.weapons.starting = rndPick(['pistol','pistol','pistol','smg','shotgun']);
+  if(L.weapons && Array.isArray(L.weapons.pickups))
+    L.weapons.pickups = L.weapons.pickups.map(w=>({ type:rndPick(RND_WEAPONS), pos:jitterPos(walls, w.pos, 16) }));
+  if(Array.isArray(L.powerups))
+    L.powerups = L.powerups.map(p=>({ type:rndPick(RND_POWERUPS), pos:jitterPos(walls, p.pos, 16) }));
+  if(Array.isArray(L.enemies))
+    L.enemies = L.enemies.map(e=>{
+      const type = e.type==='boss' ? 'boss' : rndPick(RND_ENEMIES);   // keep bosses as bosses
+      const r = (ENEMY_DEFS[type]||{r:15}).r;
+      return { type, pos:jitterPos(walls, e.pos, r) };                // drop overrides → clean defaults
+    });
+  return L;
 }
 
 /* ============================ LEVEL EDITOR ============================ */
