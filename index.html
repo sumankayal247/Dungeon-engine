@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DUNGEON ENGINE</title>
+<style>
+  :root{
+    --bg:#0a0b10; --panel:#12141d; --ink:#e8e6df; --muted:#8a8fa3;
+    --accent:#5ad1ff; --accent2:#ff5a7a; --gold:#ffd24a; --good:#54e08a;
+    --line:#232636;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+  #app{display:flex;height:100%;width:100%;overflow:hidden}
+  /* ---- Side panel (editor) ---- */
+  #side{width:380px;min-width:340px;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:14px;gap:10px;overflow:auto;
+    transition:margin-left .28s ease, opacity .22s ease}
+  #side.collapsed{margin-left:-402px;opacity:0;pointer-events:none}
+  .setlabel{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;
+    padding:4px 0;cursor:pointer}
+  .setlabel input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+  #side h1{font-size:18px;letter-spacing:3px;margin:0;color:var(--accent)}
+  #side h1 span{color:var(--accent2)}
+  .sub{color:var(--muted);font-size:11px;margin:-4px 0 6px;line-height:1.5}
+  textarea{flex:0 0 auto;height:240px;resize:vertical;background:#0c0e16;color:#cfe9ff;
+    border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;
+    font-family:inherit;line-height:1.45;white-space:pre;overflow:auto}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  button{flex:1;cursor:pointer;background:#1b1f2e;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;font-family:inherit;font-size:12px;letter-spacing:.5px;
+    transition:.12s}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.primary{background:linear-gradient(180deg,#1f6f8f,#15536b);border-color:#2b88aa;color:#eaffff}
+  button.primary:hover{filter:brightness(1.15)}
+  #msg{font-size:12px;min-height:16px;line-height:1.5;white-space:pre-wrap}
+  #msg.err{color:var(--accent2)} #msg.ok{color:var(--good)}
+  details{border:1px solid var(--line);border-radius:8px;background:#0c0e16}
+  summary{cursor:pointer;padding:9px 11px;font-size:12px;color:var(--accent);letter-spacing:1px}
+  .doc{padding:0 12px 12px;font-size:11px;color:var(--muted);line-height:1.6}
+  .doc code{color:var(--gold)} .doc b{color:var(--ink)}
+  .legend{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:11px;color:var(--muted)}
+  .sw{width:12px;height:12px;border-radius:3px;align-self:center}
+  /* ---- Stage ---- */
+  #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 600px at 50% -10%,#161a28,#070810)}
+  canvas{background:#0b0d15;border:1px solid var(--line);box-shadow:0 0 60px #000 inset,0 0 30px #0008;
+    max-width:100%;max-height:100%;border-radius:6px}
+  #hud{position:absolute;top:14px;left:14px;right:14px;display:flex;gap:14px;
+    align-items:flex-start;pointer-events:none;font-size:13px}
+  .pill{background:#0c0e16cc;border:1px solid var(--line);border-radius:8px;padding:7px 11px;
+    backdrop-filter:blur(4px)}
+  #hpbar{width:170px;height:9px;background:#2a0f17;border-radius:5px;overflow:hidden;margin-top:5px}
+  #hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5a7a,#ffd24a);transition:width .1s}
+  #shieldfill{height:100%;width:0;background:#5ad1ff;margin-top:-9px;opacity:.85;transition:width .1s}
+  #overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:#060710d8;text-align:center;padding:20px}
+  #overlay h2{font-size:40px;letter-spacing:6px;margin:0}
+  #overlay p{color:var(--muted);margin:0;font-size:13px}
+  #overlay.win h2{color:var(--good)} #overlay.lose h2{color:var(--accent2)}
+  .kbd{color:var(--gold)}
+  .tag{color:var(--muted);font-size:10px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>DUNGEON <span>ENGINE</span></h1>
+    <div class="sub">Paste a level (JSON) below and hit <b>BUILD &amp; PLAY</b>. Don't have one?
+      Copy the AI prompt, give it to any AI, paste back what it returns.</div>
+
+    <div class="row">
+      <button class="primary" id="btnPlay">▶ BUILD &amp; PLAY</button>
+      <button id="btnSample">LOAD SAMPLE</button>
+    </div>
+    <div class="row">
+      <button id="btnPrompt">⧉ COPY AI PROMPT</button>
+      <button id="btnFormat">FORMAT JSON</button>
+    </div>
+    <div class="row">
+      <button id="btnPause">⏸ PAUSE</button>
+      <button id="btnRestart">↻ RESTART</button>
+    </div>
+
+    <textarea id="json" spellcheck="false"></textarea>
+    <div id="msg"></div>
+
+    <details open>
+      <summary>SETTINGS</summary>
+      <div class="doc" style="padding-top:6px">
+        <label class="setlabel"><input type="checkbox" id="setMinimap" checked> Show minimap</label>
+        <label class="setlabel"><input type="checkbox" id="setGrid" checked> Background grid</label>
+        <label class="setlabel"><input type="checkbox" id="setFloats" checked> Pickup popups</label>
+        <label class="setlabel"><input type="checkbox" id="setFps"> FPS counter</label>
+        <label class="setlabel"><input type="checkbox" id="setGod"> Invincible (test mode)</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>CONTROLS</summary>
+      <div class="doc">
+        <b>WASD</b> — move (hold two for diagonals)<br>
+        <b>Arrow keys</b> — aim &amp; shoot in that direction (hold two to aim diagonally)<br>
+        <b>Space</b> — fire in last aim<br>
+        <b>Esc</b> / <b>P</b> — pause (opens this panel) &nbsp;·&nbsp; <b>R</b> — restart<br>
+        The <span style="color:var(--gold)">gold dashed ray</span> shows your aim. Fight past the guards to the
+        <span style="color:var(--good)">portal</span> to escape; walk over pickups to grab them.
+      </div>
+    </details>
+
+    <details>
+      <summary>SCHEMA &amp; LEGEND</summary>
+      <div class="doc">
+        World is <code>4000 × 4000</code>; the camera follows the player. All positions are
+        <code>[x, y]</code> in that range.<br>
+        The <b>start</b> is a heal-safe zone — wall it on 3 sides with one opening; return there to recover HP.<br>
+        Enemies are dormant until you get within their <b>sight</b> and they have line-of-sight.<br><br>
+        <b>walls</b>: list of segments <code>[[x1,y1],[x2,y2]]</code>. The inverted-L =
+        <code>[[300,200],[400,200]],[[300,200],[300,300]]</code><br>
+        <b>weapons</b>: <code>pistol · smg · shotgun · sniper</code><br>
+        <b>powerups</b>: <code>health · shield · speed · damage · ammo</code><br>
+        <b>enemies</b>: <code>grunt · runner · brute · sentry · turret · mage</code><br>
+        <b>behavior</b>: <code>chase · patrol · static</code> (patrol needs a <code>path</code>)<br><br>
+        <div class="legend">
+          <span class="sw" style="background:#5ad1ff"></span><span>player start</span>
+          <span class="sw" style="background:#54e08a"></span><span>goal / portal</span>
+          <span class="sw" style="background:#7d8597"></span><span>wall</span>
+          <span class="sw" style="background:#ff5a7a"></span><span>enemy</span>
+          <span class="sw" style="background:#ffd24a"></span><span>weapon / ammo</span>
+          <span class="sw" style="background:#54e08a"></span><span>health</span>
+          <span class="sw" style="background:#5ad1ff"></span><span>shield</span>
+        </div>
+      </div>
+    </details>
+    <div class="tag">PURE CODE · NO BACKEND · NO AI INSIDE</div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="cv" width="1000" height="1000"></canvas>
+    <div id="hud">
+      <div class="pill">
+        <div>HP</div>
+        <div id="hpbar"><div id="hpfill"></div><div id="shieldfill"></div></div>
+      </div>
+      <div class="pill" id="wpnPill">WEAPON —</div>
+      <div class="pill" id="enemyPill">ENEMIES —</div>
+      <div class="pill" id="namePill" style="margin-left:auto"></div>
+    </div>
+    <div id="overlay"><h2 id="ovTitle"></h2><p id="ovText"></p></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+/* ======================================================================
+   DUNGEON ENGINE — pure client-side level interpreter + renderer.
+   Security notes: level data is parsed with JSON.parse only (never eval),
+   every field is type-checked & clamped (clampLevel), and all user strings
+   are written via textContent (never innerHTML). No network, no storage.
+   ====================================================================== */
+
+const WORLD = 4000;                    // huge world — the camera follows the player across it
+const VIEWPORT = 1000;                 // world units visible across the canvas (canvas is 1000px square)
+const WALL_THICK = 14;                 // visual + collision thickness of wall segments
+const HEAL_RATE = 22;                  // HP per second regenerated while inside the start safe zone
+const SAFE_RADIUS = 260;              // radius of the healing safe zone around the player's start
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+/* ---------- Catalogs: the FIXED vocabulary the engine recognises ---------- */
+const WEAPONS = {
+  pistol:  {name:'PISTOL',  dmg:18, rate:.30, speed:620, pellets:1, spread:0,    ammo:Infinity, color:'#cfe9ff', r:4},
+  smg:     {name:'SMG',     dmg:10, rate:.08, speed:720, pellets:1, spread:.10,  ammo:140,      color:'#9affc4', r:3},
+  shotgun: {name:'SHOTGUN', dmg:9,  rate:.70, speed:560, pellets:8, spread:.34,  ammo:28,       color:'#ffd24a', r:4},
+  sniper:  {name:'SNIPER',  dmg:75, rate:1.1, speed:1150,pellets:1, spread:0,    ammo:10, pierce:true, color:'#ff5a7a', r:5},
+};
+// sight = how close (with line of sight) the player must get before the enemy reacts
+const ENEMY_DEFS = {
+  grunt:  {hp:40,  speed:90,  behavior:'chase', dmg:10, ranged:false, sight:420, color:'#ff5a7a', r:15},
+  runner: {hp:20,  speed:165, behavior:'chase', dmg:8,  ranged:false, sight:560, color:'#ff8a5a', r:12},
+  brute:  {hp:120, speed:55,  behavior:'chase', dmg:26, ranged:false, sight:360, color:'#c45aff', r:22},
+  sentry: {hp:30,  speed:0,   behavior:'static',dmg:9,  ranged:true,  sight:560, color:'#ffce5a', r:15},
+  turret: {hp:60,  speed:0,   behavior:'static',dmg:14, ranged:true,  sight:640, color:'#ff5a7a', r:18},
+  mage:   {hp:35,  speed:70,  behavior:'patrol',dmg:12, ranged:true,  sight:520, color:'#5affd2', r:15},
+};
+const POWERUPS = {
+  health: {color:'#54e08a', sym:'+',  defVal:30},
+  shield: {color:'#5ad1ff', sym:'◇',  defVal:50},
+  speed:  {color:'#ffd24a', sym:'»',  defVal:6},   // value = seconds of boost
+  damage: {color:'#ff5a7a', sym:'★',  defVal:8},   // value = seconds of boost
+  ammo:   {color:'#9affc4', sym:'▣',  defVal:1},   // refills current weapon
+};
+
+/* ---------- PIXEL SPRITES (pure code — 16×16 grids, no image files) ----------
+   Each grid is drawn facing UP (north); the renderer rotates it to face the
+   entity's aim/heading. '.' = transparent; other chars index PAL below.        */
+const PAL = {
+  K:'#0c0e16',                                  // outline / shadow
+  B:'#3aa0d8', b:'#1f5f86', C:'#a9ecff', G:'#9aa3b2', g:'#2b2f3a', // player
+  R:'#ff5a7a', r:'#b23a55',                      // grunt
+  O:'#ff8a5a', o:'#bf5a30',                      // runner
+  P:'#c45aff', p:'#7d2fb8',                      // brute
+  W:'#eef3ff', Y:'#ffce5a',                      // sentry eye
+  M:'#9aa3b2', m:'#4a4f5e', T:'#ff5a7a',         // turret
+  A:'#5affd2', a:'#2fae8a',                       // mage
+  E:'#fff3b0', X:'#1a0e14',                       // eyes / pupils (shared)
+};
+const SPR_DATA = {
+  player: [
+    "................",".......GG.......",".......GG.......","......KGGK......",
+    "......KBBK......",".....KBCCBK.....",".....KBBBBK.....","....KBBBBBBK....",
+    "....KBbBBbBK....","....KBBBBBBK....",".....KBbbBK.....",".....KBBBBK.....",
+    ".....KbBBbK.....","......KbbK......","......KGGK......","......KKKK......",
+  ],
+  grunt: [
+    "......KKKK......","....KRRRRRRK....","...KRRRRRRRRK...","..KRRRRRRRRRRK..",
+    "..KREERRRREERK..",".KRRRXRRRRXRRRK.",".KRRRRRRRRRRRRK.",".KRRRRRRRRRRRRK.",
+    ".KRRRRrrrrRRRRK.",".KRRRRRRRRRRRRK.","..KRRRRRRRRRRK..","..KRRRRRRRRRRK..",
+    "...KRRRRRRRRK...","....KRRRRRRK....","......KKKK......","................",
+  ],
+  runner: [
+    ".......KK.......","......KOOK......","......KOOK......",".....KOOOOK.....",
+    ".....KOEEOK.....",".....KOXXOK.....","....KOOOOOOK....","....KOOOOOOK....",
+    "....KOooooOK....","...KOOOOOOOOK...","...KOOOOOOOOK...","...KOoOOOOoOK...",
+    "..KOOK....KOOK..","..KOK......KOK..","..KK........KK..","................",
+  ],
+  brute: [
+    "...K........K...","...KK......KK...","..KPPK....KPPK..","..KPPKKKKKKPPK..",
+    ".KPPPPPPPPPPPPK.",".KPPPPPPPPPPPPK.",".KPPEEPPPPEEPPK.",".KPPXXPPPPXXPPK.",
+    ".KPPPPPPPPPPPPK.",".KPKKKKKKKKKKPK.",".KPPPPPPPPPPPPK.","..KPPPPPPPPPPK..",
+    "..KPPPPPPPPPPK..","...KPPKKKKPPK...","...KKK..KKK.....","................",
+  ],
+  sentry: [
+    "......KKKK......","....KKWWWWKK....","...KWWWWWWWWK...","..KWWWWWWWWWWK..",
+    "..KWWWYYYYWWWK..",".KWWWYYYYYYWWWK.",".KWWWYYXXYYWWWK.",".KWWWYYXXYYWWWK.",
+    ".KWWWYYYYYYWWWK.",".KWWWWYYYYWWWWK.","..KWWWWWWWWWWK..","..KWWWWWWWWWWK..",
+    "...KWWWWWWWWK...","....KKWWWWKK....","......KKKK......","................",
+  ],
+  turret: [
+    ".......KK.......","......KMMK......","......KMMK......","......KMMK......",
+    "....KKMMMMKK....","...KMMMMMMMMK...","..KMMMTTTTMMMK..","..KMMTXXXXTMMK..",
+    "..KMMTTXXTTMMK..","..KMMMTTTTMMMK..","...KMMMMMMMMK...","..KMmMMMMMMmMK..",
+    ".KMMMMMMMMMMMMK.",".KMmmMMMMMMmmMK.",".KKKKKKKKKKKKKK.","................",
+  ],
+  mage: [
+    ".......KK.......","......KAAK......",".....KAAAAK.....",".....KAAAAK.....",
+    "....KAAAAAAK....","...KAAXXXXAAK...","...KAXEEEEXAK...","...KAXEEEEXAK...",
+    "...KAAXXXXAAK...","..KAAAAAAAAAAK..","..KAAAAAAAAAAK..",".KAAAAAAAAAAAAK.",
+    ".KAAAaaaaaaAAAK.",".KAAAAAAAAAAAAK.","..KKKKKKKKKKKK..","................",
+  ],
+};
+// Bake each grid into an offscreen canvas (texture + a white silhouette for hit-flash).
+function buildSprite(rows){
+  const n=16, mk=()=>{ const c=document.createElement('canvas'); c.width=c.height=n; return c; };
+  const tex=mk(), white=mk(), tx=tex.getContext('2d'), wx=white.getContext('2d');
+  for(let r=0;r<rows.length;r++) for(let col=0;col<rows[r].length;col++){
+    const ch=rows[r][col]; if(ch==='.') continue;
+    tx.fillStyle=PAL[ch]||'#ff00ff'; tx.fillRect(col,r,1,1);
+    wx.fillStyle='#ffffff'; wx.fillRect(col,r,1,1);
+  }
+  return {tex, white};
+}
+const SPRITES={}; for(const k in SPR_DATA) SPRITES[k]=buildSprite(SPR_DATA[k]);
+// Draw a sprite centred at (x,y), rotated so its "up" points along ang, scaled to size.
+function drawSprite(s, x, y, ang, size, flash){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(ang+Math.PI/2);
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(s.tex, -size/2, -size/2, size, size);
+  if(flash>0){ ctx.globalAlpha=Math.min(0.85,flash*4);
+    ctx.drawImage(s.white, -size/2, -size/2, size, size); ctx.globalAlpha=1; }
+  ctx.restore();
+}
+
+/* ---------- A built-in sample level (also the default on load) ---------- */
+const SAMPLE = {
+  name: "The Deep Vault",
+  world: 4000,
+  player: { start:[260,260], hp:100, speed:240, radius:14 },
+  goal:   { pos:[3650,3650], radius:46 },
+  walls: [
+    // ---- arena border ----
+    [[0,0],[4000,0]],[[4000,0],[4000,4000]],[[4000,4000],[0,4000]],[[0,4000],[0,0]],
+    // ---- safe start room (top-left): 3 walls + one opening on the right (gap y 320-480) ----
+    [[80,80],[560,80]],
+    [[80,80],[80,560]],
+    [[80,560],[560,560]],
+    [[560,80],[560,320]],
+    [[560,480],[560,560]],
+    // ---- vertical street x=1300 (doors at y 550-800 and y 3100-3350) ----
+    [[1300,0],[1300,550]],
+    [[1300,800],[1300,3100]],
+    [[1300,3350],[1300,4000]],
+    // ---- vertical street x=2700 (doors at y 1900-2150 and y 3300-3550) ----
+    [[2700,0],[2700,1900]],
+    [[2700,2150],[2700,3300]],
+    [[2700,3550],[2700,4000]],
+    // ---- horizontal street y=1300 (doors at x 400-650 and x 3000-3250) ----
+    [[0,1300],[400,1300]],
+    [[650,1300],[3000,1300]],
+    [[3250,1300],[4000,1300]],
+    // ---- horizontal street y=2700 (doors at x 950-1200 and x 2900-3150) ----
+    [[0,2700],[950,2700]],
+    [[1200,2700],[2900,2700]],
+    [[3150,2700],[4000,2700]]
+  ],
+  weapons: { starting:"pistol", pickups:[
+    {type:"shotgun",pos:[1750,420]},   // col1 row0
+    {type:"smg",    pos:[620,3500]},   // col0 row2
+    {type:"sniper", pos:[3700,420]}    // far top-right — detour rewards you before the boss
+  ]},
+  powerups: [
+    {type:"health",pos:[270,470],value:40},  // in the safe room
+    {type:"ammo",  pos:[1750,1000]},
+    {type:"shield",pos:[620,2200]},
+    {type:"speed", pos:[820,3500]},
+    {type:"health",pos:[2000,3500],value:45},
+    {type:"damage",pos:[3500,2000]},
+    {type:"shield",pos:[3700,820]},
+    {type:"health",pos:[2000,2000],value:45}
+  ],
+  enemies: [
+    // --- lighter enemies spread across the map (explore to clear / grab loot) ---
+    {type:"grunt",  pos:[820,820]},
+    {type:"runner", pos:[1750,620]},
+    {type:"grunt",  pos:[620,2000]},
+    {type:"turret", pos:[2000,2000]},
+    {type:"runner", pos:[820,3200]},
+    {type:"mage",   pos:[2000,3400], behavior:"patrol", path:[[2000,3400],[1500,3400],[1500,3800],[2000,3800]]},
+    {type:"grunt",  pos:[3500,820]},
+    {type:"runner", pos:[3600,2000]},
+    // --- PORTAL GUARDIANS: dense + powerful, blocking the bottom-right exit ---
+    {type:"brute",  pos:[3030,2860]},                       // guards the north door
+    {type:"brute",  pos:[2860,3430]},                       // guards the west door
+    {type:"turret", pos:[3000,3000]},
+    {type:"turret", pos:[3850,3000]},
+    {type:"sentry", pos:[3650,3250]},
+    {type:"runner", pos:[3350,3650]},
+    {type:"runner", pos:[3950,3650]},
+    {type:"brute",  pos:[3650,3850], hp:420, speed:48, damage:36}  // the WARDEN — boss by the portal
+  ]
+};
+
+/* ============================ VALIDATION ============================ */
+function num(v, d){ return (typeof v === 'number' && isFinite(v)) ? v : d; }
+function clamp(v, lo, hi){ return v < lo ? lo : v > hi ? hi : v; }
+function pt(p, d){                                   // sanitise an [x,y] pair
+  if(!Array.isArray(p)) return d.slice();
+  return [ clamp(num(p[0], d[0]), 0, WORLD), clamp(num(p[1], d[1]), 0, WORLD) ];
+}
+
+// Turn arbitrary parsed JSON into a guaranteed-safe level. Never throws on
+// content; collects warnings for unknown types but keeps going.
+function clampLevel(raw){
+  const warn = [];
+  if(typeof raw !== 'object' || raw === null) throw new Error('Top level must be a JSON object { ... }');
+  const L = {};
+  L.name = (typeof raw.name === 'string') ? raw.name.slice(0,60) : 'Untitled Dungeon';
+
+  const p = raw.player || {};
+  L.player = {
+    start: pt(p.start, [100,100]),
+    hp:    clamp(num(p.hp, 100), 1, 9999),
+    speed: clamp(num(p.speed, 230), 40, 600),
+    radius:clamp(num(p.radius, 14), 6, 40),
+  };
+  const g = raw.goal || {};
+  L.goal = { pos: pt(g.pos, [WORLD-100,WORLD-100]), radius: clamp(num(g.radius,32),12,120) };
+
+  // walls: array of [[x1,y1],[x2,y2]]
+  L.walls = [];
+  if(Array.isArray(raw.walls)){
+    raw.walls.forEach(seg=>{
+      if(Array.isArray(seg) && seg.length>=2){
+        L.walls.push([ pt(seg[0],[0,0]), pt(seg[1],[0,0]) ]);
+      }
+    });
+  }
+
+  // weapons
+  const w = raw.weapons || {};
+  L.startingWeapon = WEAPONS[w.starting] ? w.starting : 'pistol';
+  if(w.starting && !WEAPONS[w.starting]) warn.push('unknown starting weapon "'+w.starting+'" → pistol');
+  L.weaponPickups = [];
+  if(Array.isArray(w.pickups)){
+    w.pickups.forEach(it=>{
+      if(it && WEAPONS[it.type]) L.weaponPickups.push({ type:it.type, pos:pt(it.pos,[500,500]) });
+      else if(it) warn.push('unknown weapon pickup "'+(it.type)+'" skipped');
+    });
+  }
+
+  // powerups
+  L.powerups = [];
+  if(Array.isArray(raw.powerups)){
+    raw.powerups.forEach(it=>{
+      if(it && POWERUPS[it.type]){
+        L.powerups.push({ type:it.type, pos:pt(it.pos,[500,500]),
+          value: clamp(num(it.value, POWERUPS[it.type].defVal), 1, 999) });
+      } else if(it) warn.push('unknown powerup "'+(it.type)+'" skipped');
+    });
+  }
+
+  // enemies
+  L.enemies = [];
+  if(Array.isArray(raw.enemies)){
+    raw.enemies.forEach(it=>{
+      if(!it) return;
+      const def = ENEMY_DEFS[it.type];
+      if(!def){ warn.push('unknown enemy "'+(it.type)+'" skipped'); return; }
+      const beh = ['chase','patrol','static'].includes(it.behavior) ? it.behavior : def.behavior;
+      let path = null;
+      if(Array.isArray(it.path) && it.path.length>0) path = it.path.map(q=>pt(q,[500,500]));
+      L.enemies.push({
+        type:it.type, def,
+        pos: pt(it.pos,[500,500]),
+        hp:  clamp(num(it.hp, def.hp), 1, 99999),
+        speed: clamp(num(it.speed, def.speed), 0, 400),
+        behavior: beh,
+        ranged: (typeof it.ranged === 'boolean') ? it.ranged : def.ranged,
+        sight: clamp(num(it.sight, def.sight), 80, 1400),
+        dmg: clamp(num(it.damage, def.dmg), 1, 999),
+        path,
+      });
+    });
+  }
+
+  if(!isReachable(L)) warn.push('the GOAL looks walled off from the start — add an opening (a gap in a wall) so the player can reach it.');
+  return { level:L, warn };
+}
+
+// Coarse flood-fill: rasterise walls onto a grid and BFS from start to goal.
+// Advisory only (never blocks play) — catches dungeons with no opening into a room.
+function isReachable(L){
+  const CELL=40, N=Math.ceil(WORLD/CELL);
+  const blocked=new Uint8Array(N*N);
+  for(let gy=0;gy<N;gy++) for(let gx=0;gx<N;gx++){
+    const cx=gx*CELL+CELL/2, cy=gy*CELL+CELL/2;
+    for(const s of L.walls){
+      if(distToSeg(cx,cy, s[0][0],s[0][1], s[1][0],s[1][1]) < WALL_THICK/2+6){ blocked[gy*N+gx]=1; break; }
+    }
+  }
+  const idx=(x,y)=>Math.floor(y/CELL)*N+Math.floor(x/CELL);
+  const start=idx(L.player.start[0],L.player.start[1]);
+  const goal=idx(L.goal.pos[0],L.goal.pos[1]);
+  if(blocked[start]||blocked[goal]) return true;   // start/goal on a wall — don't false-alarm
+  const seen=new Uint8Array(N*N), q=[start]; seen[start]=1;
+  const D=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  while(q.length){
+    const c=q.pop(); if(c===goal) return true;
+    const gx=c%N, gy=(c-gx)/N;
+    for(const [dx,dy] of D){
+      const nx=gx+dx, ny=gy+dy; if(nx<0||ny<0||nx>=N||ny>=N) continue;
+      const ni=ny*N+nx; if(seen[ni]||blocked[ni]) continue; seen[ni]=1; q.push(ni);
+    }
+  }
+  return false;
+}
+
+/* ============================ GAME STATE ============================ */
+let G = null;          // active game object
+let raf = null;
+let lastT = 0;
+let fps = 0;
+const keys = {};
+const settings = { minimap:true, grid:true, floats:true, fps:false, god:false };
+
+// floating, fading, colored pickup label above the player
+function floatText(txt, color){
+  if(!G) return;
+  G.floats.push({ txt, color, x:G.player.x, y:G.player.y - G.player.r - 16, life:1.2, max:1.2 });
+}
+const PU_LABEL = { health:'Health +', shield:'Shield +', speed:'Speed +', damage:'Damage +', ammo:'Ammo +' };
+
+function newGame(L){
+  const W = WEAPONS[L.startingWeapon];
+  G = {
+    L,
+    state:'play',                 // play | win | lose | pause
+    player:{ x:L.player.start[0], y:L.player.start[1], r:L.player.radius,
+             hp:L.player.hp, maxhp:L.player.hp, shield:0,
+             speed:L.player.speed, baseSpeed:L.player.speed,
+             weapon:L.startingWeapon, ammo:W.ammo, cd:0,
+             dmgBoost:0, spdBoost:0, hitFlash:0,
+             aim:0, aiming:false },
+    bullets:[],
+    enemies:L.enemies.map((e,i)=>({
+      x:e.pos[0], y:e.pos[1], r:e.def.r, hp:e.hp, maxhp:e.hp, speed:e.speed,
+      behavior:e.behavior, ranged:e.ranged, dmg:e.dmg, sight:e.sight, def:e.def, type:e.type,
+      path:e.path, wp:0, cd:(i*0.37)%1.3, aggro:false, lastSeen:[e.pos[0],e.pos[1]],
+      face:Math.PI/2, touchCd:0, hitFlash:0, dead:false
+    })),
+    powerups:L.powerups.map(p=>({ ...p, taken:false })),
+    weaponPickups:L.weaponPickups.map(p=>({ ...p, taken:false })),
+    particles:[],
+    floats:[],
+    time:0,
+    cam:{ x:clamp(L.player.start[0]-VIEWPORT/2,0,WORLD-VIEWPORT),
+          y:clamp(L.player.start[1]-VIEWPORT/2,0,WORLD-VIEWPORT) },
+    safe:{ x:L.player.start[0], y:L.player.start[1], r:SAFE_RADIUS },
+  };
+  setText('namePill', L.name);
+  hideOverlay();
+}
+
+/* ============================ GEOMETRY ============================ */
+function distToSeg(px,py, ax,ay, bx,by){
+  const dx=bx-ax, dy=by-ay;
+  const len2 = dx*dx+dy*dy;
+  let t = len2 ? ((px-ax)*dx+(py-ay)*dy)/len2 : 0;
+  t = clamp(t,0,1);
+  const cx=ax+t*dx, cy=ay+t*dy;
+  return Math.hypot(px-cx, py-cy);
+}
+function circleHitsWalls(x,y,r){
+  const lim = r + WALL_THICK/2;
+  for(const s of G.L.walls){
+    if(distToSeg(x,y, s[0][0],s[0][1], s[1][0],s[1][1]) < lim) return true;
+  }
+  return false;
+}
+function segIntersect(a,b,c,d){      // do segments ab & cd cross? (for line-of-sight)
+  const ccw=(p,q,r)=>(r[1]-p[1])*(q[0]-p[0]) - (q[1]-p[1])*(r[0]-p[0]);
+  return (ccw(a,c,d) * ccw(b,c,d) < 0) && (ccw(a,b,c) * ccw(a,b,d) < 0);
+}
+function lineOfSight(ax,ay,bx,by){
+  const A=[ax,ay], B=[bx,by];
+  for(const s of G.L.walls){ if(segIntersect(A,B,s[0],s[1])) return false; }
+  return true;
+}
+// move with wall sliding (axis-separated)
+function moveEntity(e, dx, dy){
+  if(dx){ const nx=clamp(e.x+dx,0,WORLD); if(!circleHitsWalls(nx,e.y,e.r)) e.x=nx; }
+  if(dy){ const ny=clamp(e.y+dy,0,WORLD); if(!circleHitsWalls(e.x,ny,e.r)) e.y=ny; }
+}
+function chaseToward(e, tx, ty, dt){
+  const a=Math.atan2(ty-e.y, tx-e.x);
+  moveEntity(e, Math.cos(a)*e.speed*dt, Math.sin(a)*e.speed*dt);
+}
+
+/* ============================ UPDATE ============================ */
+function update(dt){
+  if(G.state!=='play') return;
+  G.time += dt;
+  const P = G.player;
+
+  // ---- movement: WASD (8-way; press two for diagonals) ----
+  let mx=0,my=0;
+  if(keys['w']) my-=1;
+  if(keys['s']) my+=1;
+  if(keys['a']) mx-=1;
+  if(keys['d']) mx+=1;
+  if(mx||my){ const m=Math.hypot(mx,my); mx/=m; my/=m; }
+  const spd = P.speed * (P.spdBoost>0 ? 1.7 : 1);
+  moveEntity(P, mx*spd*dt, my*spd*dt);
+
+  // boost timers
+  if(P.spdBoost>0) P.spdBoost-=dt;
+  if(P.dmgBoost>0) P.dmgBoost-=dt;
+  if(P.hitFlash>0) P.hitFlash-=dt;
+
+  // ---- aiming: ARROW keys (8-way; press two for diagonals). Holding an arrow also FIRES. ----
+  let ax=0,ay=0;
+  if(keys['arrowleft'])  ax-=1;
+  if(keys['arrowright']) ax+=1;
+  if(keys['arrowup'])    ay-=1;
+  if(keys['arrowdown'])  ay+=1;
+  P.cd -= dt;
+  if(ax||ay){
+    P.aim = Math.atan2(ay, ax);     // face/aim the held direction
+    P.aiming = true;
+    if(P.cd<=0) fire();             // auto-fire while aiming (twin-stick style)
+  } else {
+    P.aiming = false;
+    if(keys[' '] && P.cd<=0) fire(); // optional: Space fires in the last-aimed direction
+  }
+
+  // ---- pickups ----
+  for(const w of G.weaponPickups){
+    if(!w.taken && Math.hypot(P.x-w.pos[0],P.y-w.pos[1]) < P.r+16){
+      w.taken=true; P.weapon=w.type; P.ammo=WEAPONS[w.type].ammo; burst(w.pos[0],w.pos[1],'#ffd24a');
+      floatText(WEAPONS[w.type].name, WEAPONS[w.type].color);
+    }
+  }
+  for(const p of G.powerups){
+    if(p.taken || Math.hypot(P.x-p.pos[0],P.y-p.pos[1]) >= P.r+16) continue;
+    p.taken=true; burst(p.pos[0],p.pos[1],POWERUPS[p.type].color);
+    floatText(PU_LABEL[p.type], POWERUPS[p.type].color);
+    if(p.type==='health') P.hp=Math.min(P.maxhp,P.hp+p.value);
+    else if(p.type==='shield') P.shield=Math.min(150,P.shield+p.value);
+    else if(p.type==='speed') P.spdBoost=p.value;
+    else if(p.type==='damage') P.dmgBoost=p.value;
+    else if(p.type==='ammo' && WEAPONS[P.weapon].ammo!==Infinity) P.ammo=WEAPONS[P.weapon].ammo;
+  }
+
+  // ---- enemies (proximity-driven: idle until they spot the player) ----
+  for(const e of G.enemies){
+    if(e.dead) continue;
+    if(e.hitFlash>0) e.hitFlash-=dt;
+    if(e.touchCd>0) e.touchCd-=dt;
+    const toP = Math.hypot(P.x-e.x, P.y-e.y);
+
+    // detection: must be within sight range AND have line of sight
+    const canSee = toP < e.sight && lineOfSight(e.x,e.y,P.x,P.y);
+    if(canSee){ e.aggro=true; e.lastSeen[0]=P.x; e.lastSeen[1]=P.y; }
+
+    if(e.aggro && e.speed>0){
+      // chase the last place the player was seen; give up once we get there blind
+      const dl=Math.hypot(e.lastSeen[0]-e.x, e.lastSeen[1]-e.y);
+      if(dl>6) chaseToward(e, e.lastSeen[0], e.lastSeen[1], dt);
+      else if(!canSee) e.aggro=false;
+    } else if(e.behavior==='patrol' && e.path && e.speed>0){
+      // unaware patroller walks its route
+      const tgt=e.path[e.wp];
+      if(Math.hypot(tgt[0]-e.x, tgt[1]-e.y) < 8) e.wp=(e.wp+1)%e.path.length;
+      else chaseToward(e, tgt[0], tgt[1], dt);
+    }
+    // chase-type enemies that are unaware simply hold position (proximity behaviour)
+
+    // ranged attack only when it actually sees the player
+    if(e.ranged){
+      e.cd-=dt;
+      if(e.cd<=0 && canSee){
+        e.cd=1.3;
+        const a=Math.atan2(P.y-e.y,P.x-e.x);
+        G.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*360,vy:Math.sin(a)*360,
+          dmg:e.dmg,team:'enemy',r:6,life:3,color:e.def.color});
+      }
+    }
+    // contact damage
+    if(toP < e.r+P.r && e.touchCd<=0){ e.touchCd=0.6; hurtPlayer(e.dmg); }
+
+    // facing (for sprite rotation): look at the player if seen, else toward goal of movement
+    if(canSee) e.face = Math.atan2(P.y-e.y, P.x-e.x);
+    else if(e.aggro) e.face = Math.atan2(e.lastSeen[1]-e.y, e.lastSeen[0]-e.x);
+    else if(e.behavior==='patrol' && e.path) e.face = Math.atan2(e.path[e.wp][1]-e.y, e.path[e.wp][0]-e.x);
+  }
+
+  // ---- safe zone: regenerate HP while standing in the start room ----
+  if(Math.hypot(P.x-G.safe.x, P.y-G.safe.y) < G.safe.r){
+    P.hp = Math.min(P.maxhp, P.hp + HEAL_RATE*dt);
+  }
+
+  // ---- bullets ----
+  for(const b of G.bullets){
+    b.x += b.vx*dt; b.y += b.vy*dt; b.life-=dt;
+    if(b.life<=0 || b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){ b.dead=true; continue; }
+    // walls
+    for(const s of G.L.walls){
+      if(distToSeg(b.x,b.y, s[0][0],s[0][1], s[1][0],s[1][1]) < WALL_THICK/2+b.r){
+        b.dead=true; burst(b.x,b.y,'#666'); break;
+      }
+    }
+    if(b.dead) continue;
+    if(b.team==='player'){
+      for(const e of G.enemies){
+        if(e.dead) continue;
+        if(Math.hypot(b.x-e.x,b.y-e.y) < e.r+b.r){
+          e.hp-=b.dmg; e.hitFlash=0.1; burst(b.x,b.y,e.def.color);
+          if(!b.pierce) b.dead=true;
+          if(e.hp<=0){ e.dead=true; burst(e.x,e.y,e.def.color); burst(e.x,e.y,e.def.color); }
+          if(!b.pierce) break;
+        }
+      }
+    } else { // enemy bullet
+      if(Math.hypot(b.x-P.x,b.y-P.y) < P.r+b.r){ b.dead=true; hurtPlayer(b.dmg); }
+    }
+  }
+  G.bullets = G.bullets.filter(b=>!b.dead);
+
+  // ---- particles ----
+  for(const pp of G.particles){ pp.x+=pp.vx*dt; pp.y+=pp.vy*dt; pp.life-=dt; }
+  G.particles = G.particles.filter(p=>p.life>0);
+
+  // ---- floating pickup text (drifts up, fades) ----
+  for(const f of G.floats){ f.y -= 26*dt; f.life -= dt; }
+  G.floats = G.floats.filter(f=>f.life>0);
+
+  // ---- camera follows the player, smoothed, clamped to world bounds ----
+  const ctx_=clamp(P.x-VIEWPORT/2,0,WORLD-VIEWPORT), cty=clamp(P.y-VIEWPORT/2,0,WORLD-VIEWPORT);
+  const k=Math.min(1,dt*8);
+  G.cam.x += (ctx_-G.cam.x)*k; G.cam.y += (cty-G.cam.y)*k;
+
+  // ---- win / lose ----
+  if(Math.hypot(P.x-G.L.goal.pos[0], P.y-G.L.goal.pos[1]) < G.L.goal.radius+P.r) win();
+  if(P.hp<=0) lose();
+}
+
+function fire(){
+  const P=G.player, W=WEAPONS[P.weapon];
+  if(P.ammo<=0){ P.weapon='pistol'; P.ammo=Infinity; floatText('Pistol', WEAPONS.pistol.color); return; }
+  P.cd = W.rate;
+  if(W.ammo!==Infinity) P.ammo--;
+  const base = P.aim;                 // threat-weighted auto-aim direction
+  const dmg = W.dmg * (P.dmgBoost>0 ? 2 : 1);
+  for(let i=0;i<W.pellets;i++){
+    const a = base + (Math.random()-0.5)*W.spread;
+    G.bullets.push({ x:P.x+Math.cos(base)*(P.r+6), y:P.y+Math.sin(base)*(P.r+6),
+      vx:Math.cos(a)*W.speed, vy:Math.sin(a)*W.speed,
+      dmg, team:'player', r:W.r, life:2, pierce:!!W.pierce, color:W.color });
+  }
+}
+function hurtPlayer(d){
+  if(settings.god) return;
+  const P=G.player; P.hitFlash=0.18;
+  if(P.shield>0){ const a=Math.min(P.shield,d); P.shield-=a; d-=a; }
+  P.hp-=d;
+}
+function burst(x,y,color){
+  for(let i=0;i<7;i++){ const a=Math.random()*6.28, s=40+Math.random()*120;
+    G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.3+Math.random()*.3,color}); }
+}
+
+/* ============================ RENDER ============================ */
+function render(){
+  ctx.clearRect(0,0,cv.width,cv.height);            // clear in screen space
+  ctx.save();
+  ctx.translate(-Math.round(G.cam.x), -Math.round(G.cam.y));  // <-- camera: world drawn relative to player
+
+  // grid (only the visible window, so a big world stays cheap to draw)
+  if(settings.grid){
+    const x0=Math.floor(G.cam.x/50)*50, y0=Math.floor(G.cam.y/50)*50;
+    ctx.strokeStyle='#141826'; ctx.lineWidth=1;
+    for(let x=x0;x<=G.cam.x+VIEWPORT;x+=50){ ctx.beginPath();ctx.moveTo(x,G.cam.y);ctx.lineTo(x,G.cam.y+VIEWPORT);ctx.stroke(); }
+    for(let y=y0;y<=G.cam.y+VIEWPORT;y+=50){ ctx.beginPath();ctx.moveTo(G.cam.x,y);ctx.lineTo(G.cam.x+VIEWPORT,y);ctx.stroke(); }
+  }
+
+  // safe zone (healing) around the start
+  const sz=G.safe, sp=1+0.05*Math.sin(G.time*2);
+  ctx.save(); ctx.translate(sz.x,sz.y);
+  const sg=ctx.createRadialGradient(0,0,sz.r*0.3,0,0,sz.r*sp);
+  sg.addColorStop(0,'#54e08a22'); sg.addColorStop(.8,'#54e08a10'); sg.addColorStop(1,'#54e08a00');
+  ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(0,0,sz.r*sp,0,6.29); ctx.fill();
+  ctx.setLineDash([10,12]); ctx.strokeStyle='#54e08a66'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(0,0,sz.r,0,6.29); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#54e08a99'; ctx.font='bold 22px monospace'; ctx.textAlign='center';
+  ctx.fillText('SAFE · HEAL', 0, -sz.r+26); ctx.restore();
+
+  // goal — ethereal portal (the exit). Touching it = victory.
+  const gp=G.L.goal, pulse=1+0.14*Math.sin(G.time*4);
+  ctx.save(); ctx.translate(gp.pos[0],gp.pos[1]);
+  for(let ring=3;ring>=1;ring--){                   // layered glow for an ethereal feel
+    const rr=gp.radius*pulse*(0.6+ring*0.5);
+    const grad=ctx.createRadialGradient(0,0,2,0,0,rr);
+    grad.addColorStop(0,'#e9fff4'); grad.addColorStop(.45,'#7af0c8'); grad.addColorStop(1,'#54e08a00');
+    ctx.globalAlpha=ring===1?0.9:0.3;
+    ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(0,0,rr,0,6.29); ctx.fill();
+  }
+  ctx.globalAlpha=1; ctx.rotate(G.time*0.6);         // slow swirl
+  ctx.strokeStyle='#eafff5'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(0,0,gp.radius*0.55,0.4,3.6); ctx.stroke();
+  ctx.restore();
+
+  // walls
+  ctx.strokeStyle='#7d8597'; ctx.lineWidth=WALL_THICK; ctx.lineCap='round';
+  ctx.shadowColor='#5ad1ff55'; ctx.shadowBlur=8;
+  for(const s of G.L.walls){ ctx.beginPath(); ctx.moveTo(s[0][0],s[0][1]); ctx.lineTo(s[1][0],s[1][1]); ctx.stroke(); }
+  ctx.shadowBlur=0;
+
+  // pickups
+  for(const w of G.weaponPickups){ if(w.taken) continue;
+    drawIcon(w.pos[0],w.pos[1],'#ffd24a','▸'); }
+  for(const p of G.powerups){ if(p.taken) continue;
+    drawIcon(p.pos[0],p.pos[1],POWERUPS[p.type].color,POWERUPS[p.type].sym); }
+
+  // particles
+  for(const pp of G.particles){ ctx.globalAlpha=Math.max(0,pp.life*2); ctx.fillStyle=pp.color;
+    ctx.fillRect(pp.x-2,pp.y-2,4,4); } ctx.globalAlpha=1;
+
+  // bullets
+  for(const b of G.bullets){ ctx.fillStyle=b.color; ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,6.29); ctx.fill(); }
+
+  // enemies (pixel sprites, rotated to face)
+  for(const e of G.enemies){ if(e.dead) continue;
+    const spr=SPRITES[e.type]||SPRITES.grunt;
+    drawSprite(spr, e.x, e.y, e.face, e.r*2.7, e.hitFlash);
+    // hp bar
+    if(e.hp<e.maxhp){ ctx.fillStyle='#000a'; ctx.fillRect(e.x-e.r,e.y-e.r-12,e.r*2,4);
+      ctx.fillStyle='#54e08a'; ctx.fillRect(e.x-e.r,e.y-e.r-12,e.r*2*(e.hp/e.maxhp),4); }
+  }
+
+  // aim indicator — a dashed ray in the direction the arrow keys are pointing
+  const P=G.player;
+  if(P.aiming){
+    ctx.save(); ctx.globalAlpha=.5; ctx.strokeStyle='#ffd24a'; ctx.lineWidth=2;
+    ctx.setLineDash([6,10]);
+    ctx.beginPath(); ctx.moveTo(P.x,P.y);
+    ctx.lineTo(P.x+Math.cos(P.aim)*260, P.y+Math.sin(P.aim)*260); ctx.stroke();
+    ctx.restore();
+  }
+
+  // player (pixel sprite, faces aim direction)
+  if(P.shield>0){ ctx.save(); ctx.strokeStyle='#5ad1ff'; ctx.lineWidth=2; ctx.globalAlpha=.7;
+    ctx.beginPath();ctx.arc(P.x,P.y,P.r+7,0,6.29);ctx.stroke(); ctx.restore(); }
+  drawSprite(SPRITES.player, P.x, P.y, P.aim, P.r*2.9, P.hitFlash);
+
+  // floating, fading, colored pickup text
+  if(settings.floats && G.floats.length){
+    ctx.save(); ctx.textAlign='center'; ctx.font='bold 24px ui-monospace,monospace';
+    ctx.shadowColor='#000'; ctx.shadowBlur=5;
+    for(const f of G.floats){ ctx.globalAlpha=clamp(f.life/f.max,0,1); ctx.fillStyle=f.color;
+      ctx.fillText(f.txt, f.x, f.y); }
+    ctx.restore();
+  }
+
+  ctx.restore();        // end camera transform
+  if(settings.minimap) drawMinimap();
+  if(settings.fps){ ctx.save(); ctx.fillStyle='#8a8fa3'; ctx.font='12px ui-monospace,monospace';
+    ctx.textAlign='left'; ctx.fillText('FPS '+Math.round(fps), 14, cv.height-14); ctx.restore(); }
+  drawHUD();
+}
+
+// small minimap so the whole big dungeon is still legible at a glance
+function drawMinimap(){
+  const S=150, pad=14, ox=cv.width-S-pad, oy=cv.height-S-pad, sc=S/WORLD;
+  ctx.save();
+  ctx.globalAlpha=.85; ctx.fillStyle='#0c0e16'; ctx.strokeStyle='#232636'; ctx.lineWidth=1;
+  ctx.fillRect(ox,oy,S,S); ctx.strokeRect(ox,oy,S,S);
+  ctx.strokeStyle='#7d8597'; ctx.lineWidth=1;
+  for(const s of G.L.walls){ ctx.beginPath();
+    ctx.moveTo(ox+s[0][0]*sc, oy+s[0][1]*sc); ctx.lineTo(ox+s[1][0]*sc, oy+s[1][1]*sc); ctx.stroke(); }
+  // goal, enemies, player
+  const gp=G.L.goal; ctx.fillStyle='#54e08a';
+  ctx.beginPath(); ctx.arc(ox+gp.pos[0]*sc, oy+gp.pos[1]*sc, 3, 0, 6.29); ctx.fill();
+  ctx.fillStyle='#ff5a7a';
+  for(const e of G.enemies){ if(e.dead) continue;
+    ctx.fillRect(ox+e.x*sc-1.5, oy+e.y*sc-1.5, 3, 3); }
+  const P=G.player; ctx.fillStyle='#5ad1ff';
+  ctx.beginPath(); ctx.arc(ox+P.x*sc, oy+P.y*sc, 3, 0, 6.29); ctx.fill();
+  // current viewport box
+  ctx.strokeStyle='#5ad1ff88';
+  ctx.strokeRect(ox+G.cam.x*sc, oy+G.cam.y*sc, VIEWPORT*sc, VIEWPORT*sc);
+  ctx.restore();
+}
+function drawIcon(x,y,color,sym){
+  ctx.save(); ctx.translate(x,y);
+  ctx.globalAlpha=.18; ctx.fillStyle=color; ctx.beginPath(); ctx.arc(0,0,16,0,6.29); ctx.fill();
+  ctx.globalAlpha=1; ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,12,0,6.29); ctx.stroke();
+  ctx.fillStyle=color; ctx.font='bold 16px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(sym,0,1); ctx.restore();
+}
+function drawHUD(){
+  const P=G.player;
+  document.getElementById('hpfill').style.width = clamp(P.hp/P.maxhp*100,0,100)+'%';
+  document.getElementById('shieldfill').style.width = clamp(P.shield/P.maxhp*100,0,100)+'%';
+  const W=WEAPONS[P.weapon];
+  setText('wpnPill', 'WEAPON '+W.name+'  '+(P.ammo===Infinity?'∞':P.ammo)
+    + (P.dmgBoost>0?'  ★2x':'') + (P.spdBoost>0?'  »':''));
+  const alive=G.enemies.filter(e=>!e.dead).length;
+  setText('enemyPill','ENEMIES '+alive+'/'+G.enemies.length);
+}
+
+/* ============================ LOOP ============================ */
+function loop(t){
+  raf=requestAnimationFrame(loop);
+  if(!G) return;
+  let dt=(t-lastT)/1000; lastT=t;
+  if(!isFinite(dt)||dt>0.05) dt=0.016;        // clamp big frames
+  fps = fps*0.9 + (1/Math.max(dt,1e-4))*0.1;  // smoothed FPS
+  update(dt);
+  render();
+}
+
+/* ============================ OUTCOMES ============================ */
+function win(){ G.state='win'; showOverlay('win','CONGRATULATIONS','You survived and escaped through the portal. Press R to play again.'); }
+function lose(){ G.state='lose'; showOverlay('lose','YOU DIED','Press R to retry this dungeon.'); }
+function showOverlay(cls,title,text){
+  const o=document.getElementById('overlay');
+  o.className=cls; o.style.display='flex';
+  setText('ovTitle',title); setText('ovText',text);
+}
+function hideOverlay(){ document.getElementById('overlay').style.display='none'; }
+
+/* ---- pause + sidebar (the sidebar IS the pause menu: hidden in play, shown when paused) ---- */
+function setSidebar(hide){ document.getElementById('side').classList.toggle('collapsed', hide); }
+function updatePauseBtn(){ document.getElementById('btnPause').textContent =
+  (G && G.state==='pause') ? '▶ RESUME' : '⏸ PAUSE'; }
+function togglePause(){
+  if(!G) return;
+  if(G.state==='play'){ G.state='pause'; setSidebar(false); showOverlay('','PAUSED','Press Esc or P to resume.'); }
+  else if(G.state==='pause'){ G.state='play'; setSidebar(true); hideOverlay(); cv.focus(); }
+  updatePauseBtn();
+}
+
+/* ============================ UI WIRING ============================ */
+function setText(id,t){ document.getElementById(id).textContent=t; }   // textContent = no HTML injection
+function setMsg(t,kind){ const m=document.getElementById('msg'); m.textContent=t; m.className=kind||''; }
+
+let currentLevel = null;
+function buildAndPlay(){
+  const txt=document.getElementById('json').value.trim();
+  if(!txt){ setMsg('Paste a level JSON first (or LOAD SAMPLE).','err'); return; }
+  let parsed;
+  try{ parsed=JSON.parse(txt); }                     // JSON.parse only — never eval
+  catch(e){ setMsg('JSON syntax error: '+e.message,'err'); return; }
+  let res;
+  try{ res=clampLevel(parsed); }
+  catch(e){ setMsg(e.message,'err'); return; }
+  currentLevel=res.level;
+  newGame(currentLevel);
+  setMsg('Loaded "'+res.level.name+'" — '+res.level.enemies.length+' enemies, '
+    +res.level.walls.length+' wall segments.'+(res.warn.length?'\n⚠ '+res.warn.join('\n⚠ '):''),
+    res.warn.length?'':'ok');
+  setSidebar(true); updatePauseBtn();   // playing → hide the panel
+  cv.focus();
+}
+function restart(){ if(currentLevel){ newGame(currentLevel); setSidebar(true); updatePauseBtn(); cv.focus(); } }
+
+document.getElementById('btnPlay').onclick = buildAndPlay;
+document.getElementById('btnPause').onclick = togglePause;
+document.getElementById('btnRestart').onclick = restart;
+document.getElementById('btnSample').onclick = ()=>{
+  document.getElementById('json').value = JSON.stringify(SAMPLE,null,2);
+  setMsg('Sample loaded. Hit BUILD & PLAY.','ok');
+};
+// settings checkboxes
+function bindSet(id,key){ const el=document.getElementById(id); settings[key]=el.checked;
+  el.onchange=()=>{ settings[key]=el.checked; cv.focus(); }; }
+bindSet('setMinimap','minimap'); bindSet('setGrid','grid'); bindSet('setFloats','floats');
+bindSet('setFps','fps'); bindSet('setGod','god');
+document.getElementById('btnFormat').onclick = ()=>{
+  try{ const o=JSON.parse(document.getElementById('json').value);
+       document.getElementById('json').value=JSON.stringify(o,null,2); setMsg('Formatted.','ok'); }
+  catch(e){ setMsg('Cannot format — '+e.message,'err'); }
+};
+document.getElementById('btnPrompt').onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(AI_PROMPT); setMsg('AI prompt copied to clipboard.','ok'); }
+  catch(e){ // fallback: drop into textarea
+    document.getElementById('json').value=AI_PROMPT;
+    setMsg('Clipboard blocked — prompt placed in the box instead. Copy it from there.','err'); }
+};
+
+/* input */
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase(); keys[k]=true;
+  if(k==='escape' || k==='p') togglePause();
+  if(k==='r') restart();
+  if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
+});
+addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+
+/* ============================ AI PROMPT TEXT ============================ */
+const AI_PROMPT = `You are a level designer for a top-down 2D shooter called "DUNGEON ENGINE".
+Output ONLY a single valid JSON object — no markdown, no code fences, no commentary.
+Use ONLY the fields and values listed below. Do not invent new fields or types.
+
+COORDINATES: the world is a 4000 x 4000 square. Every position is [x, y] with 0 <= x,y <= 4000.
+The camera follows the player, so make the map BIG and spread out — lots of rooms to explore.
+
+SCHEMA:
+{
+  "name": "string (the dungeon's name)",
+  "world": 4000,
+  "player": { "start": [x,y], "hp": 100, "speed": 240, "radius": 14 },
+  "goal":   { "pos": [x,y], "radius": 40 },
+  "walls":  [ [[x1,y1],[x2,y2]], ... ],
+  "weapons": {
+    "starting": "pistol",
+    "pickups": [ { "type": "<weapon>", "pos": [x,y] } ]
+  },
+  "powerups": [ { "type": "<powerup>", "pos": [x,y], "value": 30 } ],
+  "enemies": [
+    { "type": "<enemy>", "pos": [x,y], "hp": 40, "speed": 90,
+      "behavior": "<behavior>", "ranged": false, "sight": 420, "damage": 10,
+      "path": [[x,y],[x,y]] }
+  ]
+}
+
+ALLOWED VALUES (use these exact strings only):
+- weapon  : "pistol", "smg", "shotgun", "sniper"
+- powerup : "health", "shield", "speed", "damage", "ammo"
+- enemy   : "grunt", "runner", "brute", "sentry", "turret", "mage"
+- behavior: "chase", "patrol", "static"   ("patrol" requires a "path" array of waypoints)
+
+RULES:
+1. WALLS are line SEGMENTS — a pair of points [[x1,y1],[x2,y2]]. List connected segments to
+   form shapes. Example inverted-L: [[300,200],[400,200]], [[300,200],[300,300]]
+   Always enclose the arena with 4 border walls:
+   [[0,0],[4000,0]], [[4000,0],[4000,4000]], [[4000,4000],[0,4000]], [[0,4000],[0,0]]
+2. NEVER fully seal off a region. EVERY enclosed room or area MUST have at least one OPENING
+   (a gap in its wall) at least 150 units wide. The player must be able to walk from the start
+   all the way to the goal — leave a continuous path. Double-check that no room is closed off.
+3. SAFE START ROOM: build a small room around "player.start" with walls on THREE sides and ONE
+   opening (gap >= 150 wide). This is the player's healing safe zone. Keep it clear of enemies.
+4. Put "player.start" (top-left-ish) and "goal.pos" (far away, e.g. bottom-right) far apart,
+   both in OPEN space, not inside a wall.
+5. GUARD THE PORTAL: cluster your STRONGEST and MOST enemies (brutes, turrets, a high-"hp" boss
+   brute) in and around the goal so the player cannot just rush it. Spread weaker enemies, weapon
+   pickups and powerups across the OTHER rooms so the player must EXPLORE and gear up before the exit.
+6. Use 12-20 enemies total across this big map, 3 weapon pickups, and 5-8 powerups.
+   Enemies stay dormant until the player comes within their sight, so place some as ambushes.
+7. OPTIONAL per-enemy overrides: "hp", "speed", "damage", "ranged", "sight". Omit them to use the
+   engine defaults for that enemy type. Only "patrol" enemies need a "path".
+8. Output the JSON object and NOTHING else.
+
+Now design a dungeon with this theme: <DESCRIBE YOUR THEME HERE, e.g. "a flooded prison with sniper towers">`;
+
+/* ============================ BOOT ============================ */
+document.getElementById('json').value = JSON.stringify(SAMPLE,null,2);
+currentLevel = clampLevel(SAMPLE).level;
+newGame(currentLevel);
+updatePauseBtn();
+setMsg('Sample dungeon loaded and running. WASD = move, ARROW KEYS = aim & shoot. Press Esc to pause (this panel is the pause menu). The portal is heavily guarded — gear up first!','ok');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

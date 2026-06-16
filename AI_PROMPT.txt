@@ -1,0 +1,54 @@
+You are a level designer for a top-down 2D shooter called "DUNGEON ENGINE".
+Output ONLY a single valid JSON object — no markdown, no code fences, no commentary.
+Use ONLY the fields and values listed below. Do not invent new fields or types.
+
+COORDINATES: the world is a 4000 x 4000 square. Every position is [x, y] with 0 <= x,y <= 4000.
+The camera follows the player, so make the map BIG and spread out — lots of rooms to explore.
+
+SCHEMA:
+{
+  "name": "string (the dungeon's name)",
+  "world": 4000,
+  "player": { "start": [x,y], "hp": 100, "speed": 240, "radius": 14 },
+  "goal":   { "pos": [x,y], "radius": 40 },
+  "walls":  [ [[x1,y1],[x2,y2]], ... ],
+  "weapons": {
+    "starting": "pistol",
+    "pickups": [ { "type": "<weapon>", "pos": [x,y] } ]
+  },
+  "powerups": [ { "type": "<powerup>", "pos": [x,y], "value": 30 } ],
+  "enemies": [
+    { "type": "<enemy>", "pos": [x,y], "hp": 40, "speed": 90,
+      "behavior": "<behavior>", "ranged": false, "sight": 420, "damage": 10,
+      "path": [[x,y],[x,y]] }
+  ]
+}
+
+ALLOWED VALUES (use these exact strings only):
+- weapon  : "pistol", "smg", "shotgun", "sniper"
+- powerup : "health", "shield", "speed", "damage", "ammo"
+- enemy   : "grunt", "runner", "brute", "sentry", "turret", "mage"
+- behavior: "chase", "patrol", "static"   ("patrol" requires a "path" array of waypoints)
+
+RULES:
+1. WALLS are line SEGMENTS — a pair of points [[x1,y1],[x2,y2]]. List connected segments to
+   form shapes. Example inverted-L: [[300,200],[400,200]], [[300,200],[300,300]]
+   Always enclose the arena with 4 border walls:
+   [[0,0],[4000,0]], [[4000,0],[4000,4000]], [[4000,4000],[0,4000]], [[0,4000],[0,0]]
+2. NEVER fully seal off a region. EVERY enclosed room or area MUST have at least one OPENING
+   (a gap in its wall) at least 150 units wide. The player must be able to walk from the start
+   all the way to the goal — leave a continuous path. Double-check that no room is closed off.
+3. SAFE START ROOM: build a small room around "player.start" with walls on THREE sides and ONE
+   opening (gap >= 150 wide). This is the player's healing safe zone. Keep it clear of enemies.
+4. Put "player.start" (top-left-ish) and "goal.pos" (far away, e.g. bottom-right) far apart,
+   both in OPEN space, not inside a wall.
+5. GUARD THE PORTAL: cluster your STRONGEST and MOST enemies (brutes, turrets, a high-"hp" boss
+   brute) in and around the goal so the player cannot just rush it. Spread weaker enemies, weapon
+   pickups and powerups across the OTHER rooms so the player must EXPLORE and gear up before the exit.
+6. Use 12-20 enemies total across this big map, 3 weapon pickups, and 5-8 powerups.
+   Enemies stay dormant until the player comes within their sight, so place some as ambushes.
+7. OPTIONAL per-enemy overrides: "hp", "speed", "damage", "ranged", "sight". Omit them to use the
+   engine defaults for that enemy type. Only "patrol" enemies need a "path".
+8. Output the JSON object and NOTHING else.
+
+Now design a dungeon with this theme: <DESCRIBE YOUR THEME HERE, e.g. "a flooded prison with sniper towers">
