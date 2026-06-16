@@ -64,6 +64,11 @@ There are two ways — pick whichever you like:
 2. Paste it into any AI chat and tell it your theme — something like *"a flooded prison with sniper towers and a crumbling courtyard."*
 3. Copy the JSON it gives back, paste it into the box, and hit **▶ BUILD & PLAY**.
 
+**C) Roll the dice**
+
+- **🎲 Remix** keeps a layout but shuffles the enemies, loot and weapons for instant replayability.
+- **🏗️ Generate** builds a brand-new dungeon from scratch — a connected room-maze with a safe start, a guarded boss room, and loot spread throughout. It validates reachability and retries until the level is solvable, with a little "the Dungeon Master is building your level…" loader while it works.
+
 Either way, the engine checks everything, fixes anything out of range, and even warns you if the exit accidentally got walled off.
 
 ## 🔗 Share your dungeon

@@ -126,6 +126,22 @@
   #toast.on{opacity:1}
   #toast.ok{border-color:var(--good);color:#cfeede}
   #toast.err{border-color:var(--accent2);color:#ffc7d2}
+  /* ---- "Dungeon Master is building" loader ---- */
+  #loader{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;background:#05060bf2;backdrop-filter:blur(5px)}
+  #loader.on{display:flex}
+  .ld-art{height:92px;display:flex;align-items:flex-end;gap:2px}
+  .ld-hammer{font-size:60px;display:inline-block;transform-origin:78% 85%;animation:swing .62s ease-in-out infinite}
+  .ld-anvil{font-size:48px;display:inline-block;animation:thump .62s ease-in-out infinite}
+  @keyframes swing{0%{transform:rotate(-58deg)}42%{transform:rotate(6deg)}54%{transform:rotate(6deg)}100%{transform:rotate(-58deg)}}
+  @keyframes thump{0%,44%{transform:translateY(0)}50%{transform:translateY(4px) scale(1.05)}62%{transform:translateY(0)}}
+  .ld-title{font-family:'Papyrus','Copperplate',fantasy;letter-spacing:3px;color:#e9d9b0;font-size:20px;
+    text-align:center;text-transform:uppercase;padding:0 22px}
+  .ld-sub{color:var(--muted);font-size:13px;letter-spacing:1px}
+  .ld-dots i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);margin-left:4px;
+    opacity:.3;animation:dot 1s infinite}
+  .ld-dots i:nth-child(2){animation-delay:.2s} .ld-dots i:nth-child(3){animation-delay:.4s}
+  @keyframes dot{0%,100%{opacity:.3}50%{opacity:1}}
   /* ---- mobile touch sticks ---- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none;z-index:5}
   body.touch #touch{display:block}
@@ -151,7 +167,10 @@
     </div>
 
     <textarea id="json" spellcheck="false" placeholder="Paste a level JSON here (it auto-formats)…"></textarea>
-    <div class="row"><button id="btnRandom">🎲 RANDOMIZE</button></div>
+    <div class="row">
+      <button id="btnRandom" title="Keep the layout, shuffle enemies &amp; loot">🎲 Remix</button>
+      <button id="btnGenerate" title="Build a brand-new dungeon from scratch">🏗️ Generate</button>
+    </div>
     <div id="msg"></div>
 
     <div style="flex:1 1 auto"></div>
@@ -308,6 +327,12 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div id="loader">
+      <div class="ld-art"><span class="ld-hammer">🔨</span><span class="ld-anvil">🧱</span></div>
+      <div class="ld-title">The Dungeon Master is building your level…</div>
+      <div class="ld-sub">please wait <span class="ld-dots"><i></i><i></i><i></i></span></div>
     </div>
 
     <div id="toast"></div>
@@ -1248,7 +1273,17 @@ document.getElementById('btnRandom').onclick=()=>{
   let obj; try{ obj=getCurrentLevelObj(); }catch(e){ toast('Fix the JSON first — '+e.message,'err',3600); return; }
   document.getElementById('json').value=JSON.stringify(randomizeLevel(obj),null,2);
   buildAndPlay();
-  toast('🎲 Randomized — same layout, fresh enemies & loot ✓','ok',3000);
+  toast('🎲 Remixed — same layout, fresh enemies & loot ✓','ok',3000);
+};
+document.getElementById('btnGenerate').onclick=()=>{
+  showLoader(true);                              // "Dungeon Master is building…" (min ~1.6s so the hammering plays)
+  setTimeout(()=>{
+    let lvl; try{ lvl=generateDungeon(); }
+    catch(e){ showLoader(false); toast('Generation hiccup — try again.','err',3000); return; }
+    document.getElementById('json').value=JSON.stringify(lvl,null,2);
+    showLoader(false); buildAndPlay();
+    toast('🏗️ Built "'+lvl.name+'" ✓','ok',3200);
+  }, 1600);
 };
 document.getElementById('pmResume').onclick=togglePause;
 document.getElementById('pmRestart').onclick=restart;
@@ -1324,6 +1359,8 @@ function jitterPos(walls,pos,r){            // try a few nearby spots; keep orig
 }
 function randomizeLevel(o){
   const L = JSON.parse(JSON.stringify(o));
+  const base = (typeof L.name==='string' ? L.name : 'Dungeon').replace(/\s*-\s*Randomized$/,'');
+  L.name = base + ' - Randomized';     // mark remixes (don't stack the suffix)
   const walls = Array.isArray(L.walls) ? L.walls : [];
   if(L.weapons) L.weapons.starting = rndPick(['pistol','pistol','pistol','smg','shotgun']);
   if(L.weapons && Array.isArray(L.weapons.pickups))
@@ -1338,6 +1375,84 @@ function randomizeLevel(o){
     });
   return L;
 }
+
+/* ============================ PROCEDURAL GENERATOR ============================ */
+// Grid-maze dungeon: carve a guaranteed-connected room layout (spanning tree +
+// extra loops), place everything in open space, then VALIDATE with the reachability
+// flood-fill and retry until valid (rejection sampling).
+function rndName(){
+  const a=['Sunken','Cursed','Forgotten','Shattered','Bleak','Molten','Frozen','Howling','Crimson','Obsidian','Whispering','Buried'];
+  const b=['Crypt','Vault','Catacomb','Warren','Spire','Hollow','Labyrinth','Sanctum','Depths','Maze','Tombs','Keep'];
+  return rndPick(a)+' '+rndPick(b);
+}
+function buildDungeon(){
+  const GN = 3 + Math.floor(Math.random()*2);      // 3x3 or 4x4 rooms
+  const cell = WORLD/GN, DOOR = 220;
+  const vdoor={}, hdoor={}, key=(c,r)=>c+','+r, visited=new Set();
+  const neigh=(c,r)=>{ const n=[]; if(c>0)n.push([c-1,r,'W']); if(c<GN-1)n.push([c+1,r,'E']);
+    if(r>0)n.push([c,r-1,'N']); if(r<GN-1)n.push([c,r+1,'S']); return n; };
+  const carve=(c,r,dir)=>{ if(dir==='E')vdoor[(c+1)+','+r]=1; else if(dir==='W')vdoor[c+','+r]=1;
+    else if(dir==='S')hdoor[(r+1)+','+c]=1; else hdoor[r+','+c]=1; };
+  // randomized-DFS spanning tree → every room connected
+  const stack=[[0,0]]; visited.add(key(0,0));
+  while(stack.length){
+    const [c,r]=stack[stack.length-1];
+    const opts=neigh(c,r).filter(([nc,nr])=>!visited.has(key(nc,nr)));
+    if(!opts.length){ stack.pop(); continue; }
+    const [nc,nr,dir]=opts[Math.floor(Math.random()*opts.length)];
+    carve(c,r,dir); visited.add(key(nc,nr)); stack.push([nc,nr]);
+  }
+  // extra doorways → loops / more open feel
+  for(let c=0;c<GN;c++) for(let r=0;r<GN;r++) for(const [,, dir] of neigh(c,r)) if(Math.random()<0.18) carve(c,r,dir);
+  // assemble walls
+  const gap=(a,b)=>{ const lo=a+DOOR/2+50, hi=b-DOOR/2-50; return lo<hi ? lo+Math.random()*(hi-lo) : (a+b)/2; };
+  const walls=[ [[0,0],[WORLD,0]],[[WORLD,0],[WORLD,WORLD]],[[WORLD,WORLD],[0,WORLD]],[[0,WORLD],[0,0]] ];
+  for(let c=1;c<GN;c++){ const x=c*cell; for(let r=0;r<GN;r++){ const y0=r*cell,y1=(r+1)*cell;
+    if(vdoor[c+','+r]){ const g=gap(y0,y1); walls.push([[x,y0],[x,g-DOOR/2]]); walls.push([[x,g+DOOR/2],[x,y1]]); }
+    else walls.push([[x,y0],[x,y1]]); } }
+  for(let r=1;r<GN;r++){ const y=r*cell; for(let c=0;c<GN;c++){ const x0=c*cell,x1=(c+1)*cell;
+    if(hdoor[r+','+c]){ const g=gap(x0,x1); walls.push([[x0,y],[g-DOOR/2,y]]); walls.push([[g+DOOR/2,y],[x1,y]]); }
+    else walls.push([[x0,y],[x1,y]]); } }
+  // safe start room in the top-left cell, with one opening on the right
+  const rs=460;
+  walls.push([[60,60],[60+rs,60]], [[60,60],[60,60+rs]], [[60,60+rs],[60+rs,60+rs]],
+             [[60+rs,60],[60+rs,60+rs*0.4]], [[60+rs,60+rs*0.66],[60+rs,60+rs]]);
+  const start=[Math.round(60+rs*0.45), Math.round(60+rs*0.45)];
+  const goal=[Math.round((GN-0.4)*cell), Math.round((GN-0.4)*cell)];
+
+  const L={ name:rndName(), world:WORLD,
+    player:{start, hp:100, speed:240, radius:14},
+    goal:{pos:goal, radius:46},
+    walls, weapons:{starting:'pistol', pickups:[]}, powerups:[], enemies:[] };
+
+  // placement helpers (open space, away from the start)
+  const cells=[]; for(let c=0;c<GN;c++)for(let r=0;r<GN;r++) cells.push([c,r]);
+  function place(c,r,radius){
+    for(let i=0;i<16;i++){
+      const x=c*cell+120+Math.random()*(cell-240), y=r*cell+120+Math.random()*(cell-240);
+      if(clearOfWalls(walls,x,y,radius) && Math.hypot(x-start[0],y-start[1])>SAFE_RADIUS+80)
+        return [Math.round(x),Math.round(y)];
+    } return null;
+  }
+  for(const wt of ['smg','shotgun','sniper']){ const cp=rndPick(cells), p=place(cp[0],cp[1],16); if(p) L.weapons.pickups.push({type:wt,pos:p}); }
+  const npow=5+Math.floor(Math.random()*3);
+  for(let i=0;i<npow;i++){ const cp=rndPick(cells), p=place(cp[0],cp[1],16); if(p) L.powerups.push({type:rndPick(RND_POWERUPS),pos:p}); }
+  const nen=12+Math.floor(Math.random()*7);
+  for(let i=0;i<nen;i++){ const cp=rndPick(cells); if(cp[0]===0&&cp[1]===0) continue;     // keep the start room calm
+    const type=rndPick(RND_ENEMIES), p=place(cp[0],cp[1],(ENEMY_DEFS[type]||{r:15}).r); if(p) L.enemies.push({type,pos:p}); }
+  for(let i=0;i<3;i++){ const p=place(GN-1,GN-1,18); if(p) L.enemies.push({type:rndPick(['brute','turret','dasher','bomber']),pos:p}); }
+  const bp=place(GN-1,GN-1,34) || [goal[0]-130,goal[1]-130];
+  L.enemies.push({type:'boss',pos:bp});
+  return L;
+}
+function generateDungeon(){
+  for(let attempt=0; attempt<50; attempt++){    // rejection sampling
+    const L=buildDungeon();
+    if(isReachable(L)) return L;                 // collision + reachability guard
+  }
+  return buildDungeon();                          // fallback (effectively never hit — tree is always connected)
+}
+function showLoader(on){ document.getElementById('loader').classList.toggle('on', on); }
 
 /* ============================ LEVEL EDITOR ============================ */
 const ED = { level:null, cam:{x:0,y:0}, zoom:0.25, tool:'wall', snap:true, drag:null, mouse:{wx:0,wy:0}, hover:null };
