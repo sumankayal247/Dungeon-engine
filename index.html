@@ -142,6 +142,15 @@
     opacity:.3;animation:dot 1s infinite}
   .ld-dots i:nth-child(2){animation-delay:.2s} .ld-dots i:nth-child(3){animation-delay:.4s}
   @keyframes dot{0%,100%{opacity:.3}50%{opacity:1}}
+  /* ---- custom tooltip (replaces native title=) ---- */
+  #tip{position:fixed;z-index:60;transform:translate(-50%,-100%);background:#171b24;border:1px solid var(--line);
+    color:var(--ink);font-size:12px;letter-spacing:.2px;padding:6px 10px;border-radius:8px;pointer-events:none;
+    opacity:0;transition:opacity .12s;white-space:nowrap;box-shadow:0 8px 22px #000a;max-width:240px}
+  #tip.on{opacity:1}
+  #tip::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:var(--line)}
+  #tip.below{transform:translate(-50%,0)}
+  #tip.below::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--line)}
   /* ---- mobile touch sticks ---- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none;z-index:5}
   body.touch #touch{display:block}
@@ -168,8 +177,8 @@
 
     <textarea id="json" spellcheck="false" placeholder="Paste a level JSON here (it auto-formats)…"></textarea>
     <div class="row">
-      <button id="btnRandom" title="Keep the layout, shuffle enemies &amp; loot">🎲 Remix</button>
-      <button id="btnGenerate" title="Build a brand-new dungeon from scratch">🏗️ Generate</button>
+      <button id="btnRandom" data-tip="Keep the layout, shuffle enemies &amp; loot">🎲 Remix</button>
+      <button id="btnGenerate" data-tip="Build a brand-new dungeon from scratch">🏗️ Generate</button>
     </div>
     <div id="msg"></div>
 
@@ -194,8 +203,8 @@
     </div>
 
     <div id="topRight">
-      <button class="iconbtn" id="btnHelp" title="How to play">? Help</button>
-      <button class="iconbtn" id="btnEdit" title="Edit this level">✎ Edit</button>
+      <button class="iconbtn" id="btnHelp" data-tip="How to play">? Help</button>
+      <button class="iconbtn" id="btnEdit" data-tip="Edit this level">✎ Edit</button>
     </div>
 
     <div id="pauseMenu">
@@ -1310,6 +1319,19 @@ document.getElementById('btnPrompt').onclick=async ()=>{
   try{ await navigator.clipboard.writeText(AI_PROMPT); toast('Level prompt copied ✓','ok'); }
   catch(e){ document.getElementById('json').value=AI_PROMPT; toast('Clipboard blocked — prompt placed in the box.','err',3600); }
 };
+// custom tooltip for [data-tip] elements (styled to match the site)
+const tipEl=document.createElement('div'); tipEl.id='tip'; document.body.appendChild(tipEl);
+function placeTip(el){
+  const t=el.getAttribute('data-tip'); if(!t) return;
+  tipEl.textContent=t;
+  const r=el.getBoundingClientRect(), below=r.top<70;     // flip under the element if near the top edge
+  tipEl.classList.toggle('below', below);
+  tipEl.style.left=(r.left+r.width/2)+'px';
+  tipEl.style.top=(below ? r.bottom+8 : r.top-8)+'px';
+  tipEl.classList.add('on');
+}
+document.addEventListener('mouseover',e=>{ const el=e.target.closest&&e.target.closest('[data-tip]'); if(el) placeTip(el); });
+document.addEventListener('mouseout', e=>{ const el=e.target.closest&&e.target.closest('[data-tip]'); if(el) tipEl.classList.remove('on'); });
 
 /* ============================ SHARE LINKS ============================ */
 // Encode/decode a level object to a URL-safe, UTF-8-safe base64 string.
