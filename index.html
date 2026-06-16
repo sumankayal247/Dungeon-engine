@@ -14,13 +14,14 @@
 <meta property="og:image" content="icon-512.png" />
 <style>
   :root{
-    --bg:#0a0b10; --panel:#12141d; --ink:#e8e6df; --muted:#8a8fa3;
-    --accent:#5ad1ff; --accent2:#ff5a7a; --gold:#ffd24a; --good:#54e08a;
-    --line:#232636;
+    --bg:#0a0c11; --panel:#11141c; --ink:#e8eaf0; --muted:#878ea0;
+    --accent:#6ad0ff; --accent2:#ff6b88; --gold:#ffd36b; --good:#5fe3a1;
+    --line:#1e2230; --radius:12px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+    font-family:-apple-system,system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
   #app{display:flex;height:100%;width:100%;overflow:hidden}
   /* ---- Side panel (editor) ---- */
   #side{width:380px;min-width:340px;background:var(--panel);border-right:1px solid var(--line);
@@ -30,19 +31,20 @@
   .setlabel{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;
     padding:4px 0;cursor:pointer}
   .setlabel input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
-  #side h1{font-size:18px;letter-spacing:3px;margin:0;color:var(--accent)}
-  #side h1 span{color:var(--accent2)}
-  .sub{color:var(--muted);font-size:11px;margin:-4px 0 6px;line-height:1.5}
-  textarea{flex:0 0 auto;height:240px;resize:vertical;background:#0c0e16;color:#cfe9ff;
-    border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;
-    font-family:inherit;line-height:1.45;white-space:pre;overflow:auto}
+  #side h1{font-size:17px;letter-spacing:2px;margin:0;color:var(--ink);font-weight:600}
+  #side h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:12px;margin:-2px 0 8px;line-height:1.55}
+  textarea{flex:0 0 auto;height:230px;resize:vertical;background:#0b0e15;color:#cfe9ff;
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px;font-size:12px;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;line-height:1.5;white-space:pre;overflow:auto}
+  textarea:focus{outline:none;border-color:#33506a}
   .row{display:flex;gap:8px;flex-wrap:wrap}
-  button{flex:1;cursor:pointer;background:#1b1f2e;color:var(--ink);border:1px solid var(--line);
-    border-radius:8px;padding:10px 12px;font-family:inherit;font-size:12px;letter-spacing:.5px;
-    transition:.12s}
-  button:hover{border-color:var(--accent);color:#fff}
-  button.primary{background:linear-gradient(180deg,#1f6f8f,#15536b);border-color:#2b88aa;color:#eaffff}
-  button.primary:hover{filter:brightness(1.15)}
+  button{flex:1;cursor:pointer;background:#171b24;color:var(--ink);border:1px solid var(--line);
+    border-radius:10px;padding:11px 13px;font-family:inherit;font-size:13px;letter-spacing:.2px;
+    transition:.14s}
+  button:hover{border-color:#39414f;background:#1d2230;color:#fff}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#05222e;font-weight:600}
+  button.primary:hover{filter:brightness(1.07)}
   #msg{font-size:12px;min-height:16px;line-height:1.5;white-space:pre-wrap}
   #msg.err{color:var(--accent2)} #msg.ok{color:var(--good)}
   details{border:1px solid var(--line);border-radius:8px;background:#0c0e16}
@@ -58,8 +60,8 @@
     max-width:100%;max-height:100%;border-radius:6px}
   #hud{position:absolute;top:14px;left:14px;right:14px;display:flex;gap:14px;
     align-items:flex-start;pointer-events:none;font-size:13px}
-  .pill{background:#0c0e16cc;border:1px solid var(--line);border-radius:8px;padding:7px 11px;
-    backdrop-filter:blur(4px)}
+  .pill{background:#0c0e16cc;border:1px solid var(--line);border-radius:10px;padding:7px 12px;
+    font-size:12px;letter-spacing:.3px;backdrop-filter:blur(6px)}
   #hpbar{width:170px;height:9px;background:#2a0f17;border-radius:5px;overflow:hidden;margin-top:5px}
   #hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5a7a,#ffd24a);transition:width .1s}
   #shieldfill{height:100%;width:0;background:#5ad1ff;margin-top:-9px;opacity:.85;transition:width .1s}
@@ -71,14 +73,59 @@
   .kbd{color:var(--gold)}
   .tag{color:var(--muted);font-size:10px;letter-spacing:2px}
   /* ---- level editor ---- */
+  .linkbtn{color:var(--muted);font-size:12px;letter-spacing:1px;cursor:pointer;padding:9px 2px;
+    border-top:1px solid var(--line);margin-top:4px}
+  .linkbtn:hover{color:var(--accent)}
+  /* ---- editor toolbox (right-side floating panel) ---- */
   .toolgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .toolbtn{padding:7px 4px;font-size:11px;background:#161a28;border:1px solid var(--line);
     color:var(--ink);border-radius:7px;cursor:pointer;letter-spacing:.3px;transition:.12s}
   .toolbtn:hover{border-color:var(--accent);color:#fff}
   .toolbtn.active{border-color:var(--gold);color:var(--gold);background:#241f12}
   .edsec{font-size:10px;letter-spacing:2px;color:var(--muted);margin:10px 0 4px}
-  #editorPanel{display:none;border:1px solid var(--line);border-radius:8px;padding:10px;background:#0c0e16}
+  #editorPanel{position:absolute;top:14px;right:14px;bottom:14px;width:268px;overflow:auto;z-index:14;
+    display:none;border:1px solid var(--line);border-radius:10px;padding:12px;background:#0c0e16ee;backdrop-filter:blur(5px)}
   #editorPanel.on{display:block}
+  #editorPanel h3{margin:0 0 8px;font-size:13px;letter-spacing:2px;color:var(--accent)}
+  /* ---- cinematic level title ---- */
+  #levelTitle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:8;pointer-events:none;
+    font-family:'Papyrus','Copperplate','Luminari',fantasy;text-transform:uppercase;letter-spacing:4px;
+    font-size:22px;color:#e9d9b0;text-shadow:0 2px 10px #000,0 0 18px #ffd24a55;white-space:nowrap}
+  #titleCard{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;
+    pointer-events:none;opacity:0;text-align:center;padding:0 30px}
+  #titleCard.show{animation:titlecard 3s ease forwards}
+  #titleCard span{font-family:'Papyrus','Copperplate','Luminari',fantasy;text-transform:uppercase;
+    font-size:min(9vw,78px);letter-spacing:8px;color:#f3e6c0;text-shadow:0 4px 30px #000,0 0 44px #ffd24a77}
+  @keyframes titlecard{0%{opacity:0;transform:scale(1.18)}16%{opacity:1;transform:scale(1)}
+    70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.97)}}
+  /* ---- top-right buttons ---- */
+  #topRight{position:absolute;top:14px;right:14px;display:flex;gap:8px;z-index:12}
+  .iconbtn{background:#0c0e16cc;border:1px solid var(--line);color:var(--ink);border-radius:8px;
+    padding:8px 12px;font-family:inherit;font-size:12px;cursor:pointer;backdrop-filter:blur(4px);transition:.12s}
+  .iconbtn:hover{border-color:var(--accent);color:#fff}
+  /* ---- centered pause menu ---- */
+  #pauseMenu{position:absolute;inset:0;z-index:16;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:10px;background:#05060bcc;backdrop-filter:blur(3px)}
+  #pauseMenu.on{display:flex}
+  #pauseMenu .pm-title{font-family:'Papyrus','Copperplate',fantasy;letter-spacing:8px;font-size:34px;
+    color:#e9d9b0;margin-bottom:8px;text-transform:uppercase}
+  #pauseMenu button{width:248px;flex:none;padding:12px;font-size:13px}
+  /* ---- generic modal popup ---- */
+  #modal{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    background:#05060bdd;backdrop-filter:blur(3px);padding:20px}
+  #modal.on{display:flex}
+  .modalbox{position:relative;max-width:540px;width:100%;max-height:84%;overflow:auto;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:22px 22px 18px}
+  .modalbox .doc{padding:0;font-size:13px}
+  #modalClose{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0}
+  .mc{display:none}.mc.on{display:block}
+  /* ---- toast ---- */
+  #toast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);z-index:18;pointer-events:none;
+    max-width:80%;text-align:center;background:#0c0e16ee;border:1px solid var(--gold);color:#ffe9b0;
+    border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;transition:opacity .25s}
+  #toast.on{opacity:1}
+  #toast.ok{border-color:var(--good);color:#cfeede}
+  #toast.err{border-color:var(--accent2);color:#ffc7d2}
   /* ---- mobile touch sticks ---- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none;z-index:5}
   body.touch #touch{display:block}
@@ -93,30 +140,54 @@
 </head>
 <body>
 <div id="app">
-  <aside id="side">
+  <aside id="side" class="collapsed">
     <h1>DUNGEON <span>ENGINE</span></h1>
-    <div class="sub">Paste a level (JSON) and hit <b>BUILD &amp; PLAY</b> — or build one visually with
-      <b>✎ EDIT LEVEL</b>. No JSON? Copy the AI prompt, give it to any AI, paste back what it returns.
-      Share your dungeon with <b>⧉ SHARE LINK</b>.</div>
+    <div class="sub">Paste a level and hit <b>Build &amp; Play</b>, or design one with the visual
+      <b>Edit</b> tool (top-right). No JSON? Copy the level prompt and ask any AI.</div>
 
-    <div class="row">
-      <button class="primary" id="btnPlay">▶ BUILD &amp; PLAY</button>
-      <button id="btnSample">LOAD SAMPLE</button>
+    <button class="primary" id="btnPlay">▶ BUILD &amp; PLAY</button>
+    <button id="btnPrompt">⧉ COPY LEVEL PROMPT</button>
+
+    <textarea id="json" spellcheck="false" placeholder="Paste a level JSON here (it auto-formats)…"></textarea>
+    <div id="msg"></div>
+
+    <div style="flex:1 1 auto"></div>
+    <div class="linkbtn" id="lnkSchema">📖 SCHEMA &amp; LEGEND</div>
+    <div class="tag">PURE CODE · NO BACKEND · NO AI INSIDE</div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="cv" width="1000" height="1000"></canvas>
+
+    <div id="levelTitle"></div>
+    <div id="titleCard"><span></span></div>
+
+    <div id="hud">
+      <div class="pill">
+        <div>HP</div>
+        <div id="hpbar"><div id="hpfill"></div><div id="shieldfill"></div></div>
+      </div>
+      <div class="pill" id="wpnPill">WEAPON —</div>
+      <div class="pill" id="enemyPill">ENEMIES —</div>
     </div>
-    <div class="row">
-      <button id="btnPrompt">⧉ COPY AI PROMPT</button>
-      <button id="btnFormat">FORMAT JSON</button>
+
+    <div id="topRight">
+      <button class="iconbtn" id="btnHelp" title="How to play">? Help</button>
+      <button class="iconbtn" id="btnEdit" title="Edit this level">✎ Edit</button>
     </div>
-    <div class="row" id="playRow">
-      <button id="btnPause">⏸ PAUSE</button>
-      <button id="btnRestart">↻ RESTART</button>
-    </div>
-    <div class="row">
-      <button id="btnEdit">✎ EDIT LEVEL</button>
-      <button id="btnShare">⧉ SHARE LINK</button>
+
+    <div id="pauseMenu">
+      <div class="pm-title">Paused</div>
+      <button class="primary" id="pmResume">▶ Resume</button>
+      <button id="pmRestart">↻ Restart</button>
+      <button id="pmSample">⤓ Load Sample</button>
+      <button id="pmShare">⧉ Share / Copy Link</button>
+      <button id="pmSettings">⚙ Settings</button>
+      <button id="pmControls">⌨ Controls</button>
     </div>
 
     <div id="editorPanel">
+      <h3>LEVEL EDITOR <button class="iconbtn" id="btnEditExit" style="float:right;padding:3px 9px">✕</button></h3>
       <div class="edsec">TOOLS</div>
       <div class="toolgrid">
         <button class="toolbtn" data-tool="wall">▦ Wall</button>
@@ -160,77 +231,79 @@
         <b>Right-drag</b> to pan · <b>wheel</b> to zoom. Wall = click-drag a segment.</div>
     </div>
 
-    <textarea id="json" spellcheck="false"></textarea>
-    <div id="msg"></div>
-
-    <details open>
-      <summary>SETTINGS</summary>
-      <div class="doc" style="padding-top:6px">
-        <label class="setlabel"><input type="checkbox" id="setMinimap" checked> Show minimap</label>
-        <label class="setlabel"><input type="checkbox" id="setGrid" checked> Background grid</label>
-        <label class="setlabel"><input type="checkbox" id="setFloats" checked> Pickup popups</label>
-        <label class="setlabel"><input type="checkbox" id="setSound" checked> Sound</label>
-        <label class="setlabel"><input type="checkbox" id="setShake" checked> Screen shake</label>
-        <label class="setlabel"><input type="checkbox" id="setFps"> FPS counter</label>
-        <label class="setlabel"><input type="checkbox" id="setGod"> Invincible (test mode)</label>
-      </div>
-    </details>
-
-    <details>
-      <summary>CONTROLS</summary>
-      <div class="doc">
-        <b>WASD</b> — move (hold two for diagonals)<br>
-        <b>Arrow keys</b> — aim &amp; shoot in that direction (hold two to aim diagonally)<br>
-        <b>Space</b> — fire in last aim<br>
-        <b>Esc</b> / <b>P</b> — pause (opens this panel) &nbsp;·&nbsp; <b>R</b> — restart<br>
-        The <span style="color:var(--gold)">gold dashed ray</span> shows your aim. Fight past the guards to the
-        <span style="color:var(--good)">portal</span> to escape; walk over pickups to grab them.
-      </div>
-    </details>
-
-    <details>
-      <summary>SCHEMA &amp; LEGEND</summary>
-      <div class="doc">
-        World is <code>4000 × 4000</code>; the camera follows the player. All positions are
-        <code>[x, y]</code> in that range.<br>
-        The <b>start</b> is a heal-safe zone — wall it on 3 sides with one opening; return there to recover HP.<br>
-        Enemies are dormant until you get within their <b>sight</b> and they have line-of-sight.<br><br>
-        <b>walls</b>: list of segments <code>[[x1,y1],[x2,y2]]</code>. The inverted-L =
-        <code>[[300,200],[400,200]],[[300,200],[300,300]]</code><br>
-        <b>weapons</b>: <code>pistol · smg · shotgun · sniper</code><br>
-        <b>powerups</b>: <code>health · shield · speed · damage · ammo</code><br>
-        <b>enemies</b>: <code>grunt · runner · brute · sentry · turret · mage</code><br>
-        <b>behavior</b>: <code>chase · patrol · static</code> (patrol needs a <code>path</code>)<br><br>
-        <div class="legend">
-          <span class="sw" style="background:#5ad1ff"></span><span>player start</span>
-          <span class="sw" style="background:#54e08a"></span><span>goal / portal</span>
-          <span class="sw" style="background:#7d8597"></span><span>wall</span>
-          <span class="sw" style="background:#ff5a7a"></span><span>enemy</span>
-          <span class="sw" style="background:#ffd24a"></span><span>weapon / ammo</span>
-          <span class="sw" style="background:#54e08a"></span><span>health</span>
-          <span class="sw" style="background:#5ad1ff"></span><span>shield</span>
-        </div>
-      </div>
-    </details>
-    <div class="tag">PURE CODE · NO BACKEND · NO AI INSIDE</div>
-  </aside>
-
-  <main id="stage">
-    <canvas id="cv" width="1000" height="1000"></canvas>
-    <div id="hud">
-      <div class="pill">
-        <div>HP</div>
-        <div id="hpbar"><div id="hpfill"></div><div id="shieldfill"></div></div>
-      </div>
-      <div class="pill" id="wpnPill">WEAPON —</div>
-      <div class="pill" id="enemyPill">ENEMIES —</div>
-      <div class="pill" id="namePill" style="margin-left:auto"></div>
-    </div>
     <div id="overlay"><h2 id="ovTitle"></h2><p id="ovText"></p></div>
+
     <div id="touch">
       <div class="stick" id="stickL"><div class="knob"></div></div>
       <div class="stick" id="stickR"><div class="knob"></div></div>
     </div>
+
+    <div id="modal">
+      <div class="modalbox">
+        <button class="iconbtn" id="modalClose">✕</button>
+        <div class="mc" id="mcSettings">
+          <h3>SETTINGS</h3>
+          <label class="setlabel"><input type="checkbox" id="setMinimap" checked> Show minimap</label>
+          <label class="setlabel"><input type="checkbox" id="setGrid" checked> Background grid</label>
+          <label class="setlabel"><input type="checkbox" id="setFloats" checked> Pickup popups</label>
+          <label class="setlabel"><input type="checkbox" id="setSound" checked> Sound</label>
+          <label class="setlabel"><input type="checkbox" id="setShake" checked> Screen shake</label>
+          <label class="setlabel"><input type="checkbox" id="setFps"> FPS counter</label>
+          <label class="setlabel"><input type="checkbox" id="setGod"> Invincible (test mode)</label>
+        </div>
+        <div class="mc" id="mcControls">
+          <h3>CONTROLS</h3>
+          <div class="doc">
+            <b>WASD</b> — move (hold two for diagonals)<br>
+            <b>Arrow keys</b> — aim &amp; shoot in that direction (hold two to aim diagonally)<br>
+            <b>Space</b> — fire in last aim &nbsp;·&nbsp; <b>Tab</b> — switch weapon<br>
+            <b>Esc</b> / <b>P</b> — pause &nbsp;·&nbsp; <b>R</b> — restart<br>
+            📱 On phones: <b>left stick</b> moves, <b>right stick</b> aims &amp; fires.<br><br>
+            The <span style="color:var(--gold)">gold dashed ray</span> shows your aim. Fight past the guards to the
+            <span style="color:var(--good)">portal</span> to escape; walk over pickups to grab them, and return to the
+            <span style="color:var(--good)">green safe zone</span> to heal.
+          </div>
+        </div>
+        <div class="mc" id="mcSchema">
+          <h3>SCHEMA &amp; LEGEND</h3>
+          <div class="doc">
+            World is <code>4000 × 4000</code>; the camera follows the player. All positions are
+            <code>[x, y]</code> in that range.<br>
+            The <b>start</b> is a heal-safe zone — wall it on 3 sides with one opening.<br>
+            Enemies are dormant until you get within their <b>sight</b> with line-of-sight.<br><br>
+            <b>walls</b>: segments <code>[[x1,y1],[x2,y2]]</code>. Inverted-L =
+            <code>[[300,200],[400,200]],[[300,200],[300,300]]</code><br>
+            <b>weapons</b>: <code>pistol · smg · shotgun · sniper</code><br>
+            <b>powerups</b>: <code>health · shield · speed · damage · ammo</code><br>
+            <b>enemies</b>: <code>grunt · runner · brute · sentry · turret · mage</code><br>
+            <b>behavior</b>: <code>chase · patrol · static</code> (patrol needs a <code>path</code>)<br><br>
+            <div class="legend">
+              <span class="sw" style="background:#5ad1ff"></span><span>player start</span>
+              <span class="sw" style="background:#54e08a"></span><span>goal / portal</span>
+              <span class="sw" style="background:#7d8597"></span><span>wall</span>
+              <span class="sw" style="background:#ff5a7a"></span><span>enemy</span>
+              <span class="sw" style="background:#ffd24a"></span><span>weapon / ammo</span>
+            </div>
+          </div>
+        </div>
+        <div class="mc" id="mcHelp">
+          <h3>WELCOME TO DUNGEON ENGINE 🏰</h3>
+          <div class="doc">
+            A top-down dungeon shooter you can <b>design yourself</b>.<br><br>
+            <b>To play:</b> move with <b>WASD</b>, aim &amp; shoot with the <b>arrow keys</b> (or the two
+            on-screen sticks on mobile). Grab weapons &amp; powerups, then fight to the glowing
+            <span style="color:var(--good)">exit portal</span>. <b>Esc</b> pauses.<br><br>
+            <b>To build:</b> hit <b>✎ Edit</b> (top-right) to draw your own dungeon, or paste a JSON level
+            in the left panel. No JSON? Hit <b>⧉ Copy Level Prompt</b>, give it to any AI, and paste back
+            what it returns.<br><br>
+            <b>To share:</b> pause → <b>Share / Copy Link</b> packs your whole dungeon into a URL.<br><br>
+            You can reopen this anytime with the <b>? Help</b> button.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
   </main>
 </div>
 
@@ -357,7 +430,7 @@ function drawSprite(s, x, y, ang, size, flash){
 
 /* ---------- A built-in sample level (also the default on load) ---------- */
 const SAMPLE = {
-  name: "The Deep Vault",
+  name: "Sample Dungeon",
   world: 4000,
   player: { start:[260,260], hp:100, speed:240, radius:14 },
   goal:   { pos:[3650,3650], radius:46 },
@@ -595,14 +668,17 @@ function floatText(txt, color){
 const PU_LABEL = { health:'Health +', shield:'Shield +', speed:'Speed +', damage:'Damage +', ammo:'Ammo +' };
 
 function newGame(L){
-  const W = WEAPONS[L.startingWeapon];
+  const sw = L.startingWeapon;
+  const owned = sw==='pistol' ? ['pistol'] : ['pistol', sw];
+  const ammoBy = { pistol: Infinity };
+  if(sw!=='pistol') ammoBy[sw] = WEAPONS[sw].ammo;
   G = {
     L,
     state:'play',                 // play | win | lose | pause
     player:{ x:L.player.start[0], y:L.player.start[1], r:L.player.radius,
              hp:L.player.hp, maxhp:L.player.hp, shield:0,
              speed:L.player.speed, baseSpeed:L.player.speed,
-             weapon:L.startingWeapon, ammo:W.ammo, cd:0,
+             weapon:sw, owned, ammoBy, cd:0,
              dmgBoost:0, spdBoost:0, hitFlash:0,
              aim:0, aiming:false },
     bullets:[],
@@ -622,7 +698,8 @@ function newGame(L){
           y:clamp(L.player.start[1]-VIEWPORT/2,0,WORLD-VIEWPORT) },
     safe:{ x:L.player.start[0], y:L.player.start[1], r:SAFE_RADIUS },
   };
-  setText('namePill', L.name);
+  setText('levelTitle', L.name);
+  showTitleCard(L.name);          // cinematic intro
   hideOverlay();
 }
 
@@ -703,8 +780,13 @@ function update(dt){
   // ---- pickups ----
   for(const w of G.weaponPickups){
     if(!w.taken && Math.hypot(P.x-w.pos[0],P.y-w.pos[1]) < P.r+16){
-      w.taken=true; P.weapon=w.type; P.ammo=WEAPONS[w.type].ammo; burst(w.pos[0],w.pos[1],'#ffd24a');
+      w.taken=true; burst(w.pos[0],w.pos[1],'#ffd24a');
+      const isNew = !P.owned.includes(w.type);
+      if(isNew) P.owned.push(w.type);
+      P.ammoBy[w.type] = WEAPONS[w.type].ammo;   // (re)fill that weapon
+      P.weapon = w.type;                          // switch to it
       floatText(WEAPONS[w.type].name, WEAPONS[w.type].color); SFX.weapon();
+      if(isNew && P.owned.length>=2) tabTip();    // first multi-weapon tip
     }
   }
   for(const p of G.powerups){
@@ -715,7 +797,7 @@ function update(dt){
     else if(p.type==='shield') P.shield=Math.min(150,P.shield+p.value);
     else if(p.type==='speed') P.spdBoost=p.value;
     else if(p.type==='damage') P.dmgBoost=p.value;
-    else if(p.type==='ammo' && WEAPONS[P.weapon].ammo!==Infinity) P.ammo=WEAPONS[P.weapon].ammo;
+    else if(p.type==='ammo' && P.ammoBy[P.weapon]!==Infinity) P.ammoBy[P.weapon]=WEAPONS[P.weapon].ammo;
   }
 
   // ---- enemies (proximity-driven: idle until they spot the player) ----
@@ -815,9 +897,12 @@ function update(dt){
 
 function fire(){
   const P=G.player, W=WEAPONS[P.weapon];
-  if(P.ammo<=0){ P.weapon='pistol'; P.ammo=Infinity; floatText('Pistol', WEAPONS.pistol.color); return; }
+  if(P.ammoBy[P.weapon]<=0){                       // current weapon empty → drop it, fall back to pistol
+    P.owned=P.owned.filter(w=>w==='pistol'||P.ammoBy[w]>0);
+    P.weapon='pistol'; floatText('Pistol', WEAPONS.pistol.color); return;
+  }
   P.cd = W.rate;
-  if(W.ammo!==Infinity) P.ammo--;
+  if(P.ammoBy[P.weapon]!==Infinity) P.ammoBy[P.weapon]--;
   const base = P.aim;
   const dmg = W.dmg * (P.dmgBoost>0 ? 2 : 1);
   const mx=P.x+Math.cos(base)*(P.r+8), my=P.y+Math.sin(base)*(P.r+8);
@@ -849,6 +934,18 @@ function explode(x,y,color,n,spd){
     G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.35+Math.random()*.45,color,size:2+Math.random()*5}); }
 }
 function addShake(amt){ if(settings.shake) G.shake=Math.min(34, G.shake+amt); }
+function cycleWeapon(){
+  const P=G.player; if(!P||P.owned.length<2) return;
+  const i=P.owned.indexOf(P.weapon), next=P.owned[(i+1)%P.owned.length];
+  P.weapon=next; floatText(WEAPONS[next].name, WEAPONS[next].color); blip(700,0.05,'square',0.12,420);
+}
+let tabTipShown=false;
+function tabTip(){
+  try{ if(localStorage.getItem('de_tabtip')) tabTipShown=true; }catch(e){}
+  if(tabTipShown) return;
+  tabTipShown=true; try{ localStorage.setItem('de_tabtip','1'); }catch(e){}
+  toast('New weapon! Press TAB to switch weapons.', 'ok', 3800);
+}
 
 /* ============================ RENDER ============================ */
 function render(){
@@ -984,8 +1081,9 @@ function drawHUD(){
   const P=G.player;
   document.getElementById('hpfill').style.width = clamp(P.hp/P.maxhp*100,0,100)+'%';
   document.getElementById('shieldfill').style.width = clamp(P.shield/P.maxhp*100,0,100)+'%';
-  const W=WEAPONS[P.weapon];
-  setText('wpnPill', 'WEAPON '+W.name+'  '+(P.ammo===Infinity?'∞':P.ammo)
+  const W=WEAPONS[P.weapon], ammo=P.ammoBy[P.weapon];
+  setText('wpnPill', W.name+'  '+(ammo===Infinity?'∞':ammo)
+    + (P.owned.length>1?'  ⇄'+P.owned.length:'')
     + (P.dmgBoost>0?'  ★2x':'') + (P.spdBoost>0?'  »':''));
   const alive=G.enemies.filter(e=>!e.dead).length;
   setText('enemyPill','ENEMIES '+alive+'/'+G.enemies.length);
@@ -1013,64 +1111,76 @@ function showOverlay(cls,title,text){
 }
 function hideOverlay(){ document.getElementById('overlay').style.display='none'; }
 
-/* ---- pause + sidebar (the sidebar IS the pause menu: hidden in play, shown when paused) ---- */
+/* ---- toasts, cinematic title, modals ---- */
+function setText(id,t){ const el=document.getElementById(id); if(el) el.textContent=t; }  // textContent = no HTML injection
+function setMsg(t,kind){ const m=document.getElementById('msg'); if(m){ m.textContent=t; m.className=kind||''; } }
+let toastTimer=null;
+function toast(msg,kind,ms){ const t=document.getElementById('toast'); t.textContent=msg;
+  t.className='on'+(kind?(' '+kind):''); clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('on'), ms||2600); }
+function showTitleCard(name){ const el=document.getElementById('titleCard'), sp=el.firstElementChild;
+  sp.textContent=name||''; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function openModal(which){ document.querySelectorAll('.mc').forEach(m=>m.classList.toggle('on', m.id==='mc'+which));
+  document.getElementById('modal').classList.add('on'); }
+function closeModal(){ document.getElementById('modal').classList.remove('on'); }
+function modalOpen(){ return document.getElementById('modal').classList.contains('on'); }
+
+/* ---- pause: centered menu (center) + level panel (left) both appear ---- */
 function setSidebar(hide){ document.getElementById('side').classList.toggle('collapsed', hide); }
-function updatePauseBtn(){ document.getElementById('btnPause').textContent =
-  (G && G.state==='pause') ? '▶ RESUME' : '⏸ PAUSE'; }
+function showPause(on){
+  document.getElementById('pauseMenu').classList.toggle('on', on);
+  setSidebar(!on);                       // left panel visible only while paused
+  if(!on) closeModal();
+}
 function togglePause(){
-  if(!G) return;
-  if(G.state==='play'){ G.state='pause'; setSidebar(false); showOverlay('','PAUSED','Press Esc or P to resume.'); }
-  else if(G.state==='pause'){ G.state='play'; setSidebar(true); hideOverlay(); cv.focus(); }
-  updatePauseBtn();
+  if(!G || mode!=='play') return;
+  if(G.state==='play'){ G.state='pause'; showPause(true); }
+  else if(G.state==='pause'){ G.state='play'; showPause(false); cv.focus(); }
 }
 
-/* ============================ UI WIRING ============================ */
-function setText(id,t){ document.getElementById(id).textContent=t; }   // textContent = no HTML injection
-function setMsg(t,kind){ const m=document.getElementById('msg'); m.textContent=t; m.className=kind||''; }
-
-let currentLevel = null;
+/* ---- build / play / load ---- */
+let currentLevel=null;
 function buildAndPlay(){
-  mode='play'; showEditorUI(false);             // any path into play leaves the editor
+  mode='play'; showEditorUI(false);
   const txt=document.getElementById('json').value.trim();
-  if(!txt){ setMsg('Paste a level JSON first (or LOAD SAMPLE).','err'); return; }
-  let parsed;
-  try{ parsed=JSON.parse(txt); }                     // JSON.parse only — never eval
-  catch(e){ setMsg('JSON syntax error: '+e.message,'err'); return; }
-  let res;
-  try{ res=clampLevel(parsed); }
-  catch(e){ setMsg(e.message,'err'); return; }
-  currentLevel=res.level;
-  newGame(currentLevel);
-  setMsg('Loaded "'+res.level.name+'" — '+res.level.enemies.length+' enemies, '
-    +res.level.walls.length+' wall segments.'+(res.warn.length?'\n⚠ '+res.warn.join('\n⚠ '):''),
-    res.warn.length?'':'ok');
-  setSidebar(true); updatePauseBtn();   // playing → hide the panel
+  if(!txt){ toast('Paste a level first, or hit Load Sample.','err'); return; }
+  let parsed; try{ parsed=JSON.parse(txt); }
+  catch(e){ toast('JSON error: '+e.message,'err',3600); return; }
+  let res; try{ res=clampLevel(parsed); } catch(e){ toast(e.message,'err',3600); return; }
+  currentLevel=res.level; newGame(currentLevel); showPause(false);
+  if(res.warn.length) toast('⚠ '+res.warn[0],'err',4200);
+  else toast('Loaded "'+res.level.name+'" ✓','ok');
   cv.focus();
 }
-function restart(){ if(currentLevel){ newGame(currentLevel); setSidebar(true); updatePauseBtn(); cv.focus(); } }
+function restart(){ if(currentLevel){ newGame(currentLevel); showPause(false); cv.focus(); toast('Restarted ✓','ok',1300); } }
+function loadSample(){ document.getElementById('json').value=JSON.stringify(SAMPLE,null,2); buildAndPlay(); }
 
-document.getElementById('btnPlay').onclick = buildAndPlay;
-document.getElementById('btnPause').onclick = togglePause;
-document.getElementById('btnRestart').onclick = restart;
-document.getElementById('btnSample').onclick = ()=>{
-  document.getElementById('json').value = JSON.stringify(SAMPLE,null,2);
-  setMsg('Sample loaded. Hit BUILD & PLAY.','ok');
-};
+/* ---- wiring ---- */
+document.getElementById('btnPlay').onclick=buildAndPlay;
+document.getElementById('pmResume').onclick=togglePause;
+document.getElementById('pmRestart').onclick=restart;
+document.getElementById('pmSample').onclick=loadSample;
+document.getElementById('pmShare').onclick=()=>shareLink();
+document.getElementById('pmSettings').onclick=()=>openModal('Settings');
+document.getElementById('pmControls').onclick=()=>openModal('Controls');
+document.getElementById('btnHelp').onclick=()=>openModal('Help');
+document.getElementById('btnEdit').onclick=enterEditor;
+document.getElementById('lnkSchema').onclick=()=>openModal('Schema');
+document.getElementById('modalClose').onclick=closeModal;
+document.getElementById('modal').onclick=e=>{ if(e.target.id==='modal') closeModal(); };
+// auto-format JSON on paste (no separate Format button)
+document.getElementById('json').addEventListener('paste',()=>setTimeout(()=>{
+  const ta=document.getElementById('json');
+  try{ ta.value=JSON.stringify(JSON.parse(ta.value),null,2); toast('Pasted & formatted ✓','ok',1600); }catch(e){}
+},0));
 // settings checkboxes
 function bindSet(id,key){ const el=document.getElementById(id); settings[key]=el.checked;
-  el.onchange=()=>{ settings[key]=el.checked; cv.focus(); }; }
+  el.onchange=()=>{ settings[key]=el.checked; }; }
 bindSet('setMinimap','minimap'); bindSet('setGrid','grid'); bindSet('setFloats','floats');
 bindSet('setFps','fps'); bindSet('setGod','god'); bindSet('setSound','sound'); bindSet('setShake','shake');
-document.getElementById('btnFormat').onclick = ()=>{
-  try{ const o=JSON.parse(document.getElementById('json').value);
-       document.getElementById('json').value=JSON.stringify(o,null,2); setMsg('Formatted.','ok'); }
-  catch(e){ setMsg('Cannot format — '+e.message,'err'); }
-};
-document.getElementById('btnPrompt').onclick = async ()=>{
-  try{ await navigator.clipboard.writeText(AI_PROMPT); setMsg('AI prompt copied to clipboard.','ok'); }
-  catch(e){ // fallback: drop into textarea
-    document.getElementById('json').value=AI_PROMPT;
-    setMsg('Clipboard blocked — prompt placed in the box instead. Copy it from there.','err'); }
+document.getElementById('btnPrompt').onclick=async ()=>{
+  try{ await navigator.clipboard.writeText(AI_PROMPT); toast('Level prompt copied ✓','ok'); }
+  catch(e){ document.getElementById('json').value=AI_PROMPT; toast('Clipboard blocked — prompt placed in the box.','err',3600); }
 };
 
 /* ============================ SHARE LINKS ============================ */
@@ -1083,12 +1193,12 @@ function getCurrentLevelObj(){
   return t ? JSON.parse(t) : JSON.parse(JSON.stringify(SAMPLE));
 }
 function shareLink(){
-  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ setMsg('Fix the JSON first — '+e.message,'err'); return; }
+  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ toast('Fix the JSON first — '+e.message,'err',3600); return; }
   const enc=encodeLevel(obj), url=location.origin+location.pathname+'#lvl='+enc;
   history.replaceState(null,'','#lvl='+enc);
   navigator.clipboard.writeText(url)
-    .then(()=>setMsg('🔗 Share link copied! Anyone who opens it plays your dungeon. ('+url.length+' chars)','ok'))
-    .catch(()=>{ document.getElementById('json').value=url; setMsg('Clipboard blocked — the link is in the box, copy it manually.','err'); });
+    .then(()=>toast('🔗 Share link copied to clipboard ✓','ok'))
+    .catch(()=>{ document.getElementById('json').value=url; toast('Clipboard blocked — link placed in the box.','err',3600); });
 }
 function loadFromHash(){
   if(!location.hash.startsWith('#lvl=')) return false;
@@ -1096,9 +1206,9 @@ function loadFromHash(){
     const obj=decodeLevel(location.hash.slice(5));
     document.getElementById('json').value=JSON.stringify(obj,null,2);
     buildAndPlay();
-    setMsg('🔗 Loaded a shared dungeon from the link — playing now! Pause (Esc) then ✎ EDIT LEVEL to remix it.','ok');
+    toast('🔗 Loaded a shared dungeon ✓','ok',3200);
     return true;
-  }catch(e){ setMsg('That share link looked corrupted — loading the sample instead.','err'); return false; }
+  }catch(e){ toast('Share link looked corrupted — loading the sample.','err',3600); return false; }
 }
 
 /* ============================ LEVEL EDITOR ============================ */
@@ -1129,9 +1239,6 @@ function edClampCam(){ const vw=cv.width/ED.zoom, vh=cv.height/ED.zoom, W=ED.lev
   ED.cam.y=clamp(ED.cam.y,-150,Math.max(-150,W-vh+150)); }
 function edSync(){
   document.getElementById('json').value=JSON.stringify(ED.level,null,2);
-  const L=ED.level;
-  setMsg('✎ Editing "'+L.name+'" — '+L.walls.length+' walls · '+L.enemies.length+' enemies · '
-    +L.weapons.pickups.length+' weapons · '+L.powerups.length+' powerups.','');
 }
 // Topmost editable thing under the cursor (entity > start/goal > wall).
 function edPick(m){
@@ -1157,7 +1264,7 @@ function edErase(p){ const L=ED.level;
   else if(p.kind==='enemy') L.enemies.splice(p.i,1);
   else if(p.kind==='weapon') L.weapons.pickups.splice(p.i,1);
   else if(p.kind==='powerup') L.powerups.splice(p.i,1);
-  else { setMsg('The start and exit can\'t be erased — use the Start / Exit tools to move them.','err'); return; }
+  else { toast('Start / Exit can\'t be erased — use those tools to move them.','err'); return; }
   edSync();
 }
 function edPlace(tool,x,y){ const L=ED.level, [cat,type]=tool.split(':');
@@ -1167,10 +1274,10 @@ function edPlace(tool,x,y){ const L=ED.level, [cat,type]=tool.split(':');
   edSync();
 }
 function enterEditor(){
-  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ setMsg('Fix the JSON before editing — '+e.message,'err'); return; }
+  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ toast('Fix the JSON before editing — '+e.message,'err',3600); return; }
   ED.level=edDefaults(obj); ED.drag=null; ED.hover=null;
-  mode='edit'; edFit(); setSidebar(false); showEditorUI(true); hideOverlay(); edSync();
-  setMsg('✎ EDITOR — pick a tool, then click the map. Right-drag to pan, wheel to zoom. ▶ TEST PLAY when ready.','ok');
+  mode='edit'; edFit(); showEditorUI(true); hideOverlay(); edSync();
+  toast('Editor — click the map. Right-drag to pan, wheel to zoom.','ok',3200);
 }
 function exitEditorPlay(){ edSync(); showEditorUI(false); mode='play'; buildAndPlay(); }
 function newBlank(){
@@ -1193,14 +1300,15 @@ async function exportJSON(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));
   a.download=(ED.level.name||'dungeon').replace(/[^\w-]+/g,'_')+'.json'; a.click(); URL.revokeObjectURL(a.href);
-  setMsg('⤓ Exported '+a.download+' (also copied to clipboard & shown in the box below).','ok');
+  toast('⤓ Exported '+a.download+' (copied too) ✓','ok',3200);
 }
 function showEditorUI(on){
   document.getElementById('editorPanel').classList.toggle('on',on);
-  document.getElementById('playRow').style.display=on?'none':'flex';
+  document.getElementById('topRight').style.display=on?'none':'flex';
   document.getElementById('hud').style.display=on?'none':'flex';
+  document.getElementById('levelTitle').style.display=on?'none':'block';
   document.body.classList.toggle('editing',on);     // hides touch sticks while editing
-  document.getElementById('btnEdit').textContent=on?'✕ EXIT EDITOR':'✎ EDIT LEVEL';
+  if(on){ document.getElementById('pauseMenu').classList.remove('on'); setSidebar(true); }
 }
 
 // Draw the level statically with the editor's pan/zoom camera + tool feedback.
@@ -1287,8 +1395,7 @@ document.querySelectorAll('.toolbtn').forEach(b=>{ b.onclick=()=>{ ED.tool=b.dat
   document.querySelectorAll('.toolbtn').forEach(x=>x.classList.toggle('active',x===b)); cv.focus(); }; });
 (document.querySelector('.toolbtn[data-tool="wall"]')||{}).className='toolbtn active';
 document.getElementById('edSnap').onchange=e=>{ ED.snap=e.target.checked; };
-document.getElementById('btnEdit').onclick=()=>{ mode==='play'?enterEditor():exitEditorPlay(); };
-document.getElementById('btnShare').onclick=shareLink;
+document.getElementById('btnEditExit').onclick=exitEditorPlay;
 document.getElementById('btnTestPlay').onclick=exitEditorPlay;
 document.getElementById('btnExport').onclick=exportJSON;
 document.getElementById('btnNewBlank').onclick=newBlank;
@@ -1316,8 +1423,10 @@ addEventListener('pointerdown', ensureAudio, {once:false});
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase(); keys[k]=true; ensureAudio();
   if(mode==='edit') return;                       // editor uses mouse tools, not game keys
-  if(k==='escape' || k==='p') togglePause();
-  if(k==='r') restart();
+  if(k==='escape'){ if(modalOpen()){ closeModal(); } else togglePause(); }
+  else if(k==='p') togglePause();
+  else if(k==='r') restart();
+  else if(k==='tab'){ e.preventDefault(); cycleWeapon(); }
   if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
 });
 addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
@@ -1383,9 +1492,9 @@ document.getElementById('json').value = JSON.stringify(SAMPLE,null,2);
 if(!loadFromHash()){                              // a #lvl=... shared link wins if present
   currentLevel = clampLevel(SAMPLE).level;
   newGame(currentLevel);
-  setMsg('Sample dungeon loaded and running. WASD = move, ARROW KEYS = aim & shoot. Click ✎ EDIT LEVEL to build your own, or ⧉ SHARE LINK to share it.','ok');
 }
-updatePauseBtn();
+// first-time onboarding (shown once; reopen anytime via "? Help")
+try{ if(!localStorage.getItem('de_seen')){ openModal('Help'); localStorage.setItem('de_seen','1'); } }catch(e){}
 requestAnimationFrame(loop);
 </script>
 </body>

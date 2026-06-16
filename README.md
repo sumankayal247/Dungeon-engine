@@ -32,7 +32,8 @@ A few things I'm happy with:
 | **W A S D** | Move (hold two keys for diagonals) |
 | **Arrow keys** | Aim **and** shoot in that direction (hold two to aim diagonally) |
 | **Space** | Fire in your last aim direction |
-| **Esc** / **P** | Pause (this also opens the side menu) |
+| **Tab** | Switch between picked-up weapons |
+| **Esc** / **P** | Pause (opens the menu) |
 | **R** | Restart the dungeon |
 
 📱 **On phones/tablets:** drag the on-screen sticks — **left to move, right to aim & shoot**.
