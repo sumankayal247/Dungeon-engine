@@ -79,6 +79,16 @@
   .edsec{font-size:10px;letter-spacing:2px;color:var(--muted);margin:10px 0 4px}
   #editorPanel{display:none;border:1px solid var(--line);border-radius:8px;padding:10px;background:#0c0e16}
   #editorPanel.on{display:block}
+  /* ---- mobile touch sticks ---- */
+  #touch{position:absolute;inset:0;pointer-events:none;display:none;z-index:5}
+  body.touch #touch{display:block}
+  body.touch.editing #touch{display:none}
+  .stick{position:absolute;bottom:26px;width:132px;height:132px;border-radius:50%;
+    background:#0c0e1688;border:2px solid #ffffff22;pointer-events:auto;touch-action:none}
+  #stickL{left:26px} #stickR{right:26px}
+  .knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+    background:#5ad1ff66;border:2px solid #5ad1ffcc}
+  #stickR .knob{background:#ffd24a55;border-color:#ffd24acc}
 </style>
 </head>
 <body>
@@ -159,6 +169,8 @@
         <label class="setlabel"><input type="checkbox" id="setMinimap" checked> Show minimap</label>
         <label class="setlabel"><input type="checkbox" id="setGrid" checked> Background grid</label>
         <label class="setlabel"><input type="checkbox" id="setFloats" checked> Pickup popups</label>
+        <label class="setlabel"><input type="checkbox" id="setSound" checked> Sound</label>
+        <label class="setlabel"><input type="checkbox" id="setShake" checked> Screen shake</label>
         <label class="setlabel"><input type="checkbox" id="setFps"> FPS counter</label>
         <label class="setlabel"><input type="checkbox" id="setGod"> Invincible (test mode)</label>
       </div>
@@ -215,6 +227,10 @@
       <div class="pill" id="namePill" style="margin-left:auto"></div>
     </div>
     <div id="overlay"><h2 id="ovTitle"></h2><p id="ovText"></p></div>
+    <div id="touch">
+      <div class="stick" id="stickL"><div class="knob"></div></div>
+      <div class="stick" id="stickR"><div class="knob"></div></div>
+    </div>
   </main>
 </div>
 
@@ -530,7 +546,46 @@ let lastT = 0;
 let fps = 0;
 let mode = 'play';                 // 'play' | 'edit'
 const keys = {};
-const settings = { minimap:true, grid:true, floats:true, fps:false, god:false };
+const settings = { minimap:true, grid:true, floats:true, fps:false, god:false, sound:true, shake:true };
+const moveVec = { x:0, y:0, active:false };   // left touch stick → movement
+const aimVec  = { x:0, y:0, active:false };   // right touch stick → aim + fire
+
+/* ---- Web Audio: tiny synthesized SFX, no asset files ---- */
+let AC=null, master=null;
+function ensureAudio(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain(); master.gain.value=0.3; master.connect(AC.destination); }catch(e){ AC=null; } }
+  if(AC && AC.state==='suspended') AC.resume();
+}
+function blip(freq,dur,type,gain,sweep,delay){
+  if(!AC||!settings.sound) return;
+  const t=AC.currentTime+(delay||0), o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(freq,t);
+  if(sweep) o.frequency.exponentialRampToValueAtTime(Math.max(20,sweep),t+dur);
+  g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.03);
+}
+function noise(dur,gain,filt){
+  if(!AC||!settings.sound) return;
+  const t=AC.currentTime, n=Math.max(1,Math.floor(AC.sampleRate*dur)), buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=filt||1200;
+  const g=AC.createGain(); g.gain.value=gain; src.connect(lp); lp.connect(g); g.connect(master); src.start(t);
+}
+const SFX = {
+  shoot(w){ if(w==='shotgun'){ noise(0.12,0.22,1100); blip(170,0.1,'sawtooth',0.18,70); }
+            else if(w==='sniper') blip(900,0.18,'sawtooth',0.26,120);
+            else if(w==='smg') blip(640,0.04,'square',0.13,330);
+            else blip(460,0.07,'square',0.2,190); },
+  hit(){ blip(320,0.04,'square',0.1,520); },
+  death(c){ noise(0.22,0.28,820); blip(130,0.2,'sawtooth',0.2,40); },
+  hurt(){ blip(210,0.18,'square',0.28,70); },
+  pickup(){ blip(620,0.09,'triangle',0.24); blip(940,0.12,'triangle',0.2,null,0.07); },
+  weapon(){ blip(520,0.08,'triangle',0.22); blip(680,0.08,'triangle',0.22,null,0.06); blip(860,0.12,'triangle',0.22,null,0.12); },
+  win(){ [523,659,784,1046].forEach((f,i)=>blip(f,0.22,'triangle',0.24,null,i*0.12)); },
+  lose(){ [392,330,262,196].forEach((f,i)=>blip(f,0.28,'sawtooth',0.22,null,i*0.12)); },
+};
 
 // floating, fading, colored pickup label above the player
 function floatText(txt, color){
@@ -561,6 +616,7 @@ function newGame(L){
     weaponPickups:L.weaponPickups.map(p=>({ ...p, taken:false })),
     particles:[],
     floats:[],
+    shake:0,
     time:0,
     cam:{ x:clamp(L.player.start[0]-VIEWPORT/2,0,WORLD-VIEWPORT),
           y:clamp(L.player.start[1]-VIEWPORT/2,0,WORLD-VIEWPORT) },
@@ -618,6 +674,7 @@ function update(dt){
   if(keys['a']) mx-=1;
   if(keys['d']) mx+=1;
   if(mx||my){ const m=Math.hypot(mx,my); mx/=m; my/=m; }
+  if(moveVec.active){ mx=moveVec.x; my=moveVec.y; }   // touch stick (analog) overrides keys
   const spd = P.speed * (P.spdBoost>0 ? 1.7 : 1);
   moveEntity(P, mx*spd*dt, my*spd*dt);
 
@@ -632,6 +689,7 @@ function update(dt){
   if(keys['arrowright']) ax+=1;
   if(keys['arrowup'])    ay-=1;
   if(keys['arrowdown'])  ay+=1;
+  if(aimVec.active){ ax=aimVec.x; ay=aimVec.y; }      // right touch stick aims + fires
   P.cd -= dt;
   if(ax||ay){
     P.aim = Math.atan2(ay, ax);     // face/aim the held direction
@@ -646,13 +704,13 @@ function update(dt){
   for(const w of G.weaponPickups){
     if(!w.taken && Math.hypot(P.x-w.pos[0],P.y-w.pos[1]) < P.r+16){
       w.taken=true; P.weapon=w.type; P.ammo=WEAPONS[w.type].ammo; burst(w.pos[0],w.pos[1],'#ffd24a');
-      floatText(WEAPONS[w.type].name, WEAPONS[w.type].color);
+      floatText(WEAPONS[w.type].name, WEAPONS[w.type].color); SFX.weapon();
     }
   }
   for(const p of G.powerups){
     if(p.taken || Math.hypot(P.x-p.pos[0],P.y-p.pos[1]) >= P.r+16) continue;
     p.taken=true; burst(p.pos[0],p.pos[1],POWERUPS[p.type].color);
-    floatText(PU_LABEL[p.type], POWERUPS[p.type].color);
+    floatText(PU_LABEL[p.type], POWERUPS[p.type].color); SFX.pickup();
     if(p.type==='health') P.hp=Math.min(P.maxhp,P.hp+p.value);
     else if(p.type==='shield') P.shield=Math.min(150,P.shield+p.value);
     else if(p.type==='speed') P.spdBoost=p.value;
@@ -723,9 +781,10 @@ function update(dt){
       for(const e of G.enemies){
         if(e.dead) continue;
         if(Math.hypot(b.x-e.x,b.y-e.y) < e.r+b.r){
-          e.hp-=b.dmg; e.hitFlash=0.1; burst(b.x,b.y,e.def.color);
+          e.hp-=b.dmg; e.hitFlash=0.1; burst(b.x,b.y,e.def.color); SFX.hit();
           if(!b.pierce) b.dead=true;
-          if(e.hp<=0){ e.dead=true; burst(e.x,e.y,e.def.color); burst(e.x,e.y,e.def.color); }
+          if(e.hp<=0){ e.dead=true; const big=e.r>18;
+            explode(e.x,e.y,e.def.color, big?28:16, 260); addShake(big?10:5); SFX.death(); }
           if(!b.pierce) break;
         }
       }
@@ -747,6 +806,7 @@ function update(dt){
   const ctx_=clamp(P.x-VIEWPORT/2,0,WORLD-VIEWPORT), cty=clamp(P.y-VIEWPORT/2,0,WORLD-VIEWPORT);
   const k=Math.min(1,dt*8);
   G.cam.x += (ctx_-G.cam.x)*k; G.cam.y += (cty-G.cam.y)*k;
+  if(G.shake>0){ G.shake*=0.86; if(G.shake<0.25) G.shake=0; }   // screen-shake decay
 
   // ---- win / lose ----
   if(Math.hypot(P.x-G.L.goal.pos[0], P.y-G.L.goal.pos[1]) < G.L.goal.radius+P.r) win();
@@ -758,31 +818,44 @@ function fire(){
   if(P.ammo<=0){ P.weapon='pistol'; P.ammo=Infinity; floatText('Pistol', WEAPONS.pistol.color); return; }
   P.cd = W.rate;
   if(W.ammo!==Infinity) P.ammo--;
-  const base = P.aim;                 // threat-weighted auto-aim direction
+  const base = P.aim;
   const dmg = W.dmg * (P.dmgBoost>0 ? 2 : 1);
+  const mx=P.x+Math.cos(base)*(P.r+8), my=P.y+Math.sin(base)*(P.r+8);
   for(let i=0;i<W.pellets;i++){
     const a = base + (Math.random()-0.5)*W.spread;
     G.bullets.push({ x:P.x+Math.cos(base)*(P.r+6), y:P.y+Math.sin(base)*(P.r+6),
       vx:Math.cos(a)*W.speed, vy:Math.sin(a)*W.speed,
       dmg, team:'player', r:W.r, life:2, pierce:!!W.pierce, color:W.color });
   }
+  // muzzle flash sparks + recoil shake + sound
+  for(let i=0;i<3;i++){ const a=base+(Math.random()-0.5)*0.6, s=120+Math.random()*180;
+    G.particles.push({x:mx,y:my,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.08+Math.random()*.06,color:W.color,size:2+Math.random()*3}); }
+  if(P.weapon==='sniper') addShake(4); else if(P.weapon==='shotgun') addShake(3);
+  SFX.shoot(P.weapon);
 }
 function hurtPlayer(d){
   if(settings.god) return;
   const P=G.player; P.hitFlash=0.18;
   if(P.shield>0){ const a=Math.min(P.shield,d); P.shield-=a; d-=a; }
   P.hp-=d;
+  addShake(6+Math.min(14,d*0.3)); SFX.hurt();
 }
 function burst(x,y,color){
   for(let i=0;i<7;i++){ const a=Math.random()*6.28, s=40+Math.random()*120;
     G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.3+Math.random()*.3,color}); }
 }
+function explode(x,y,color,n,spd){
+  for(let i=0;i<(n||16);i++){ const a=Math.random()*6.28, s=(spd||240)*(0.3+Math.random());
+    G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.35+Math.random()*.45,color,size:2+Math.random()*5}); }
+}
+function addShake(amt){ if(settings.shake) G.shake=Math.min(34, G.shake+amt); }
 
 /* ============================ RENDER ============================ */
 function render(){
   ctx.clearRect(0,0,cv.width,cv.height);            // clear in screen space
   ctx.save();
-  ctx.translate(-Math.round(G.cam.x), -Math.round(G.cam.y));  // <-- camera: world drawn relative to player
+  const shx=G.shake?(Math.random()*2-1)*G.shake:0, shy=G.shake?(Math.random()*2-1)*G.shake:0;
+  ctx.translate(-Math.round(G.cam.x-shx), -Math.round(G.cam.y-shy));  // camera (+ screen shake)
 
   // grid (only the visible window, so a big world stays cheap to draw)
   if(settings.grid){
@@ -832,7 +905,7 @@ function render(){
 
   // particles
   for(const pp of G.particles){ ctx.globalAlpha=Math.max(0,pp.life*2); ctx.fillStyle=pp.color;
-    ctx.fillRect(pp.x-2,pp.y-2,4,4); } ctx.globalAlpha=1;
+    const s=pp.size||4; ctx.fillRect(pp.x-s/2,pp.y-s/2,s,s); } ctx.globalAlpha=1;
 
   // bullets
   for(const b of G.bullets){ ctx.fillStyle=b.color; ctx.beginPath();
@@ -931,8 +1004,8 @@ function loop(t){
 }
 
 /* ============================ OUTCOMES ============================ */
-function win(){ G.state='win'; showOverlay('win','CONGRATULATIONS','You survived and escaped through the portal. Press R to play again.'); }
-function lose(){ G.state='lose'; showOverlay('lose','YOU DIED','Press R to retry this dungeon.'); }
+function win(){ G.state='win'; SFX.win(); showOverlay('win','CONGRATULATIONS','You survived and escaped through the portal. Press R to play again.'); }
+function lose(){ G.state='lose'; SFX.lose(); explode(G.player.x,G.player.y,'#5ad1ff',24,300); addShake(16); showOverlay('lose','YOU DIED','Press R to retry this dungeon.'); }
 function showOverlay(cls,title,text){
   const o=document.getElementById('overlay');
   o.className=cls; o.style.display='flex';
@@ -987,7 +1060,7 @@ document.getElementById('btnSample').onclick = ()=>{
 function bindSet(id,key){ const el=document.getElementById(id); settings[key]=el.checked;
   el.onchange=()=>{ settings[key]=el.checked; cv.focus(); }; }
 bindSet('setMinimap','minimap'); bindSet('setGrid','grid'); bindSet('setFloats','floats');
-bindSet('setFps','fps'); bindSet('setGod','god');
+bindSet('setFps','fps'); bindSet('setGod','god'); bindSet('setSound','sound'); bindSet('setShake','shake');
 document.getElementById('btnFormat').onclick = ()=>{
   try{ const o=JSON.parse(document.getElementById('json').value);
        document.getElementById('json').value=JSON.stringify(o,null,2); setMsg('Formatted.','ok'); }
@@ -1126,6 +1199,7 @@ function showEditorUI(on){
   document.getElementById('editorPanel').classList.toggle('on',on);
   document.getElementById('playRow').style.display=on?'none':'flex';
   document.getElementById('hud').style.display=on?'none':'flex';
+  document.body.classList.toggle('editing',on);     // hides touch sticks while editing
   document.getElementById('btnEdit').textContent=on?'✕ EXIT EDITOR':'✎ EDIT LEVEL';
 }
 
@@ -1219,9 +1293,28 @@ document.getElementById('btnTestPlay').onclick=exitEditorPlay;
 document.getElementById('btnExport').onclick=exportJSON;
 document.getElementById('btnNewBlank').onclick=newBlank;
 
+/* ---- mobile touch sticks (left = move, right = aim + fire) ---- */
+function makeStick(el, set){
+  const knob=el.querySelector('.knob'); let id=null, cx=0, cy=0, R=66;
+  function start(t){ id=t.identifier; const r=el.getBoundingClientRect();
+    cx=r.left+r.width/2; cy=r.top+r.height/2; R=r.width/2; ensureAudio(); mv(t); }
+  function mv(t){ let dx=t.clientX-cx, dy=t.clientY-cy; const m=Math.hypot(dx,dy)||1, cl=Math.min(m,R);
+    dx=dx/m*cl; dy=dy/m*cl; knob.style.transform='translate('+dx+'px,'+dy+'px)'; set(dx/R, dy/R, cl/R); }
+  function end(){ id=null; knob.style.transform='translate(0,0)'; set(0,0,0); }
+  el.addEventListener('touchstart',e=>{ e.preventDefault(); if(id===null) start(e.changedTouches[0]); },{passive:false});
+  addEventListener('touchmove',e=>{ if(id===null) return; for(const t of e.changedTouches) if(t.identifier===id){ mv(t); e.preventDefault(); } },{passive:false});
+  addEventListener('touchend',e=>{ for(const t of e.changedTouches) if(t.identifier===id) end(); });
+  addEventListener('touchcancel',e=>{ for(const t of e.changedTouches) if(t.identifier===id) end(); });
+}
+makeStick(document.getElementById('stickL'),(x,y,m)=>{ moveVec.x=x; moveVec.y=y; moveVec.active=m>0.12; });
+makeStick(document.getElementById('stickR'),(x,y,m)=>{ aimVec.x=x; aimVec.y=y; aimVec.active=m>0.3; });
+if(matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window) document.body.classList.add('touch');
+// unlock/resume the audio context on the first user gesture
+addEventListener('pointerdown', ensureAudio, {once:false});
+
 /* input */
 addEventListener('keydown',e=>{
-  const k=e.key.toLowerCase(); keys[k]=true;
+  const k=e.key.toLowerCase(); keys[k]=true; ensureAudio();
   if(mode==='edit') return;                       // editor uses mouse tools, not game keys
   if(k==='escape' || k==='p') togglePause();
   if(k==='r') restart();

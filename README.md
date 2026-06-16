@@ -20,6 +20,8 @@ A few things I'm happy with:
 - 🧠 Enemies that stay dormant until they actually spot you
 - 🩹 A safe room you can retreat to and heal
 - 🌀 A glowing exit portal — guarded, so you'll need to gear up first
+- 🔊 Synthesized sound effects + screen-shake juice (all generated in code, no audio files)
+- 📱 Works on mobile with on-screen touch sticks
 
 ---
 
@@ -32,6 +34,8 @@ A few things I'm happy with:
 | **Space** | Fire in your last aim direction |
 | **Esc** / **P** | Pause (this also opens the side menu) |
 | **R** | Restart the dungeon |
+
+📱 **On phones/tablets:** drag the on-screen sticks — **left to move, right to aim & shoot**.
 
 **Your goal:** fight your way to the glowing **portal** and step through it to escape. It's heavily guarded, so explore the map and grab weapons and powerups before you make your run.
 
