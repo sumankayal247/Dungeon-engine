@@ -44,14 +44,26 @@ A few tips:
 
 ## 🤖 Make your own dungeons
 
-This is the fun part:
+There are two ways — pick whichever you like:
+
+**A) The visual editor** (no JSON, no AI needed)
+
+1. Click **✎ EDIT LEVEL**.
+2. Pick a tool and click the map: draw **walls** (click-drag), place the **start**, the **exit**, **enemies**, **weapons** and **powerups**, or **move/erase** anything.
+3. Right-drag to pan, scroll to zoom, "Snap to grid" keeps things tidy.
+4. Hit **▶ TEST PLAY** to play it, or **⤓ EXPORT** to save the JSON.
+
+**B) Describe it to an AI**
 
 1. Hit **⧉ COPY AI PROMPT** in the side panel.
 2. Paste it into any AI chat and tell it your theme — something like *"a flooded prison with sniper towers and a crumbling courtyard."*
-3. Copy the JSON it gives back.
-4. Paste it into the box and hit **▶ BUILD & PLAY**.
+3. Copy the JSON it gives back, paste it into the box, and hit **▶ BUILD & PLAY**.
 
-That's it — your dungeon comes to life. The engine checks everything you paste, fixes anything out of range, and even warns you if the exit accidentally got walled off.
+Either way, the engine checks everything, fixes anything out of range, and even warns you if the exit accidentally got walled off.
+
+## 🔗 Share your dungeon
+
+Hit **⧉ SHARE LINK** and the whole level is packed into the URL (`…/#lvl=…`) and copied to your clipboard. Send that link to a friend and it opens straight into *your* dungeon — nothing to upload, no accounts. They can pause and remix it in the editor too.
 
 ---
 

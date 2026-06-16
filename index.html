@@ -70,14 +70,24 @@
   #overlay.win h2{color:var(--good)} #overlay.lose h2{color:var(--accent2)}
   .kbd{color:var(--gold)}
   .tag{color:var(--muted);font-size:10px;letter-spacing:2px}
+  /* ---- level editor ---- */
+  .toolgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .toolbtn{padding:7px 4px;font-size:11px;background:#161a28;border:1px solid var(--line);
+    color:var(--ink);border-radius:7px;cursor:pointer;letter-spacing:.3px;transition:.12s}
+  .toolbtn:hover{border-color:var(--accent);color:#fff}
+  .toolbtn.active{border-color:var(--gold);color:var(--gold);background:#241f12}
+  .edsec{font-size:10px;letter-spacing:2px;color:var(--muted);margin:10px 0 4px}
+  #editorPanel{display:none;border:1px solid var(--line);border-radius:8px;padding:10px;background:#0c0e16}
+  #editorPanel.on{display:block}
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="side">
     <h1>DUNGEON <span>ENGINE</span></h1>
-    <div class="sub">Paste a level (JSON) below and hit <b>BUILD &amp; PLAY</b>. Don't have one?
-      Copy the AI prompt, give it to any AI, paste back what it returns.</div>
+    <div class="sub">Paste a level (JSON) and hit <b>BUILD &amp; PLAY</b> — or build one visually with
+      <b>✎ EDIT LEVEL</b>. No JSON? Copy the AI prompt, give it to any AI, paste back what it returns.
+      Share your dungeon with <b>⧉ SHARE LINK</b>.</div>
 
     <div class="row">
       <button class="primary" id="btnPlay">▶ BUILD &amp; PLAY</button>
@@ -87,9 +97,57 @@
       <button id="btnPrompt">⧉ COPY AI PROMPT</button>
       <button id="btnFormat">FORMAT JSON</button>
     </div>
-    <div class="row">
+    <div class="row" id="playRow">
       <button id="btnPause">⏸ PAUSE</button>
       <button id="btnRestart">↻ RESTART</button>
+    </div>
+    <div class="row">
+      <button id="btnEdit">✎ EDIT LEVEL</button>
+      <button id="btnShare">⧉ SHARE LINK</button>
+    </div>
+
+    <div id="editorPanel">
+      <div class="edsec">TOOLS</div>
+      <div class="toolgrid">
+        <button class="toolbtn" data-tool="wall">▦ Wall</button>
+        <button class="toolbtn" data-tool="erase">⌫ Erase</button>
+        <button class="toolbtn" data-tool="pan">✋ Move</button>
+        <button class="toolbtn" data-tool="start">◈ Start</button>
+        <button class="toolbtn" data-tool="goal">⌾ Exit</button>
+      </div>
+      <div class="edsec">ENEMIES</div>
+      <div class="toolgrid">
+        <button class="toolbtn" data-tool="enemy:grunt">Grunt</button>
+        <button class="toolbtn" data-tool="enemy:runner">Runner</button>
+        <button class="toolbtn" data-tool="enemy:brute">Brute</button>
+        <button class="toolbtn" data-tool="enemy:sentry">Sentry</button>
+        <button class="toolbtn" data-tool="enemy:turret">Turret</button>
+        <button class="toolbtn" data-tool="enemy:mage">Mage</button>
+      </div>
+      <div class="edsec">WEAPONS</div>
+      <div class="toolgrid">
+        <button class="toolbtn" data-tool="weapon:smg">SMG</button>
+        <button class="toolbtn" data-tool="weapon:shotgun">Shotgun</button>
+        <button class="toolbtn" data-tool="weapon:sniper">Sniper</button>
+      </div>
+      <div class="edsec">POWERUPS</div>
+      <div class="toolgrid">
+        <button class="toolbtn" data-tool="powerup:health">Health</button>
+        <button class="toolbtn" data-tool="powerup:shield">Shield</button>
+        <button class="toolbtn" data-tool="powerup:speed">Speed</button>
+        <button class="toolbtn" data-tool="powerup:damage">Damage</button>
+        <button class="toolbtn" data-tool="powerup:ammo">Ammo</button>
+      </div>
+      <label class="setlabel" style="margin-top:8px"><input type="checkbox" id="edSnap" checked> Snap to grid</label>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="btnTestPlay">▶ TEST PLAY</button>
+        <button id="btnExport">⤓ EXPORT</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="btnNewBlank">＋ NEW BLANK</button>
+      </div>
+      <div class="doc" style="padding:8px 2px 0">Click the map to use the active tool.
+        <b>Right-drag</b> to pan · <b>wheel</b> to zoom. Wall = click-drag a segment.</div>
     </div>
 
     <textarea id="json" spellcheck="false"></textarea>
@@ -470,6 +528,7 @@ let G = null;          // active game object
 let raf = null;
 let lastT = 0;
 let fps = 0;
+let mode = 'play';                 // 'play' | 'edit'
 const keys = {};
 const settings = { minimap:true, grid:true, floats:true, fps:false, god:false };
 
@@ -862,6 +921,7 @@ function drawHUD(){
 /* ============================ LOOP ============================ */
 function loop(t){
   raf=requestAnimationFrame(loop);
+  if(mode==='edit'){ renderEditor(); return; }
   if(!G) return;
   let dt=(t-lastT)/1000; lastT=t;
   if(!isFinite(dt)||dt>0.05) dt=0.016;        // clamp big frames
@@ -897,6 +957,7 @@ function setMsg(t,kind){ const m=document.getElementById('msg'); m.textContent=t
 
 let currentLevel = null;
 function buildAndPlay(){
+  mode='play'; showEditorUI(false);             // any path into play leaves the editor
   const txt=document.getElementById('json').value.trim();
   if(!txt){ setMsg('Paste a level JSON first (or LOAD SAMPLE).','err'); return; }
   let parsed;
@@ -939,9 +1000,229 @@ document.getElementById('btnPrompt').onclick = async ()=>{
     setMsg('Clipboard blocked — prompt placed in the box instead. Copy it from there.','err'); }
 };
 
+/* ============================ SHARE LINKS ============================ */
+// Encode/decode a level object to a URL-safe, UTF-8-safe base64 string.
+function encodeLevel(o){ return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o))))); }
+function decodeLevel(s){ return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(s))))); }
+function getCurrentLevelObj(){
+  if(mode==='edit') return ED.level;
+  const t=document.getElementById('json').value.trim();
+  return t ? JSON.parse(t) : JSON.parse(JSON.stringify(SAMPLE));
+}
+function shareLink(){
+  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ setMsg('Fix the JSON first — '+e.message,'err'); return; }
+  const enc=encodeLevel(obj), url=location.origin+location.pathname+'#lvl='+enc;
+  history.replaceState(null,'','#lvl='+enc);
+  navigator.clipboard.writeText(url)
+    .then(()=>setMsg('🔗 Share link copied! Anyone who opens it plays your dungeon. ('+url.length+' chars)','ok'))
+    .catch(()=>{ document.getElementById('json').value=url; setMsg('Clipboard blocked — the link is in the box, copy it manually.','err'); });
+}
+function loadFromHash(){
+  if(!location.hash.startsWith('#lvl=')) return false;
+  try{
+    const obj=decodeLevel(location.hash.slice(5));
+    document.getElementById('json').value=JSON.stringify(obj,null,2);
+    buildAndPlay();
+    setMsg('🔗 Loaded a shared dungeon from the link — playing now! Pause (Esc) then ✎ EDIT LEVEL to remix it.','ok');
+    return true;
+  }catch(e){ setMsg('That share link looked corrupted — loading the sample instead.','err'); return false; }
+}
+
+/* ============================ LEVEL EDITOR ============================ */
+const ED = { level:null, cam:{x:0,y:0}, zoom:0.25, tool:'wall', snap:true, drag:null, mouse:{wx:0,wy:0}, hover:null };
+const ED_GRID = 20;
+
+// Coerce any parsed object into a complete, editable level (deep-copied).
+function edDefaults(o){
+  o=o||{}; const P=o.player||{}, Gg=o.goal||{}, Wp=o.weapons||{};
+  return {
+    name: typeof o.name==='string'?o.name:'My Dungeon',
+    world: WORLD,
+    player:{ start:Array.isArray(P.start)?P.start.slice():[300,300], hp:P.hp||100, speed:P.speed||240, radius:P.radius||14 },
+    goal:{ pos:Array.isArray(Gg.pos)?Gg.pos.slice():[WORLD-400,WORLD-400], radius:Gg.radius||46 },
+    walls: Array.isArray(o.walls)?JSON.parse(JSON.stringify(o.walls)):[],
+    weapons:{ starting:Wp.starting||'pistol', pickups:Array.isArray(Wp.pickups)?JSON.parse(JSON.stringify(Wp.pickups)):[] },
+    powerups: Array.isArray(o.powerups)?JSON.parse(JSON.stringify(o.powerups)):[],
+    enemies: Array.isArray(o.enemies)?JSON.parse(JSON.stringify(o.enemies)):[],
+  };
+}
+function edSnap(v){ return ED.snap ? clamp(Math.round(v/ED_GRID)*ED_GRID,0,WORLD) : clamp(Math.round(v),0,WORLD); }
+function edFit(){ ED.zoom=cv.width/ED.level.world; ED.cam.x=0; ED.cam.y=0; }
+function edWorld(ev){ const r=cv.getBoundingClientRect();
+  const sx=(ev.clientX-r.left)/r.width*cv.width, sy=(ev.clientY-r.top)/r.height*cv.height;
+  return { sx, sy, wx:sx/ED.zoom+ED.cam.x, wy:sy/ED.zoom+ED.cam.y }; }
+function edClampCam(){ const vw=cv.width/ED.zoom, vh=cv.height/ED.zoom, W=ED.level.world;
+  ED.cam.x=clamp(ED.cam.x,-150,Math.max(-150,W-vw+150));
+  ED.cam.y=clamp(ED.cam.y,-150,Math.max(-150,W-vh+150)); }
+function edSync(){
+  document.getElementById('json').value=JSON.stringify(ED.level,null,2);
+  const L=ED.level;
+  setMsg('✎ Editing "'+L.name+'" — '+L.walls.length+' walls · '+L.enemies.length+' enemies · '
+    +L.weapons.pickups.length+' weapons · '+L.powerups.length+' powerups.','');
+}
+// Topmost editable thing under the cursor (entity > start/goal > wall).
+function edPick(m){
+  const L=ED.level, thr=16/ED.zoom, wthr=8/ED.zoom;
+  for(let i=L.enemies.length-1;i>=0;i--){ const p=L.enemies[i].pos; if(Math.hypot(p[0]-m.wx,p[1]-m.wy)<thr+6) return {kind:'enemy',i,pos:p}; }
+  for(let i=L.weapons.pickups.length-1;i>=0;i--){ const p=L.weapons.pickups[i].pos; if(Math.hypot(p[0]-m.wx,p[1]-m.wy)<thr) return {kind:'weapon',i,pos:p}; }
+  for(let i=L.powerups.length-1;i>=0;i--){ const p=L.powerups[i].pos; if(Math.hypot(p[0]-m.wx,p[1]-m.wy)<thr) return {kind:'powerup',i,pos:p}; }
+  if(Math.hypot(L.goal.pos[0]-m.wx,L.goal.pos[1]-m.wy)<Math.max(thr,L.goal.radius)) return {kind:'goal',pos:L.goal.pos};
+  if(Math.hypot(L.player.start[0]-m.wx,L.player.start[1]-m.wy)<thr+6) return {kind:'start',pos:L.player.start};
+  for(let i=L.walls.length-1;i>=0;i--){ const s=L.walls[i]; if(distToSeg(m.wx,m.wy,s[0][0],s[0][1],s[1][0],s[1][1])<wthr+WALL_THICK/2) return {kind:'wall',i}; }
+  return null;
+}
+function edMoveTarget(p){ const L=ED.level;
+  if(p.kind==='start')   return (x,y)=>{ L.player.start=[x,y]; };
+  if(p.kind==='goal')    return (x,y)=>{ L.goal.pos=[x,y]; };
+  if(p.kind==='enemy')   return (x,y)=>{ L.enemies[p.i].pos=[x,y]; };
+  if(p.kind==='weapon')  return (x,y)=>{ L.weapons.pickups[p.i].pos=[x,y]; };
+  if(p.kind==='powerup') return (x,y)=>{ L.powerups[p.i].pos=[x,y]; };
+  return null;
+}
+function edErase(p){ const L=ED.level;
+  if(p.kind==='wall') L.walls.splice(p.i,1);
+  else if(p.kind==='enemy') L.enemies.splice(p.i,1);
+  else if(p.kind==='weapon') L.weapons.pickups.splice(p.i,1);
+  else if(p.kind==='powerup') L.powerups.splice(p.i,1);
+  else { setMsg('The start and exit can\'t be erased — use the Start / Exit tools to move them.','err'); return; }
+  edSync();
+}
+function edPlace(tool,x,y){ const L=ED.level, [cat,type]=tool.split(':');
+  if(cat==='enemy') L.enemies.push({type,pos:[x,y]});
+  else if(cat==='weapon') L.weapons.pickups.push({type,pos:[x,y]});
+  else if(cat==='powerup') L.powerups.push({type,pos:[x,y]});
+  edSync();
+}
+function enterEditor(){
+  let obj; try{ obj=getCurrentLevelObj(); }catch(e){ setMsg('Fix the JSON before editing — '+e.message,'err'); return; }
+  ED.level=edDefaults(obj); ED.drag=null; ED.hover=null;
+  mode='edit'; edFit(); setSidebar(false); showEditorUI(true); hideOverlay(); edSync();
+  setMsg('✎ EDITOR — pick a tool, then click the map. Right-drag to pan, wheel to zoom. ▶ TEST PLAY when ready.','ok');
+}
+function exitEditorPlay(){ edSync(); showEditorUI(false); mode='play'; buildAndPlay(); }
+function newBlank(){
+  if(!confirm('Start a new blank dungeon? This clears the current one in the editor.')) return;
+  ED.level=edDefaults({
+    name:'New Dungeon',
+    player:{start:[300,300],hp:100,speed:240,radius:14},
+    goal:{pos:[WORLD-400,WORLD-400],radius:46},
+    walls:[
+      [[0,0],[WORLD,0]],[[WORLD,0],[WORLD,WORLD]],[[WORLD,WORLD],[0,WORLD]],[[0,WORLD],[0,0]],
+      [[120,120],[560,120]],[[120,120],[120,560]],[[120,560],[560,560]],[[560,120],[560,320]],[[560,460],[560,560]]
+    ],
+    weapons:{starting:'pistol',pickups:[]}, powerups:[], enemies:[]
+  });
+  edFit(); edSync();
+}
+async function exportJSON(){
+  edSync(); const txt=JSON.stringify(ED.level,null,2);
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));
+  a.download=(ED.level.name||'dungeon').replace(/[^\w-]+/g,'_')+'.json'; a.click(); URL.revokeObjectURL(a.href);
+  setMsg('⤓ Exported '+a.download+' (also copied to clipboard & shown in the box below).','ok');
+}
+function showEditorUI(on){
+  document.getElementById('editorPanel').classList.toggle('on',on);
+  document.getElementById('playRow').style.display=on?'none':'flex';
+  document.getElementById('hud').style.display=on?'none':'flex';
+  document.getElementById('btnEdit').textContent=on?'✕ EXIT EDITOR':'✎ EDIT LEVEL';
+}
+
+// Draw the level statically with the editor's pan/zoom camera + tool feedback.
+function renderEditor(){
+  const L=ED.level; if(!L) return;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#070810'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.save(); ctx.scale(ED.zoom,ED.zoom); ctx.translate(-ED.cam.x,-ED.cam.y);
+  const W=L.world, iz=1/ED.zoom;
+  ctx.fillStyle='#0c0e16'; ctx.fillRect(0,0,W,W);
+  ctx.strokeStyle='#141826'; ctx.lineWidth=iz;
+  for(let x=0;x<=W;x+=200){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,W);ctx.stroke(); }
+  for(let y=0;y<=W;y+=200){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  // safe zone around start
+  ctx.save(); ctx.strokeStyle='#54e08a66'; ctx.lineWidth=2*iz; ctx.setLineDash([12*iz,12*iz]);
+  ctx.beginPath(); ctx.arc(L.player.start[0],L.player.start[1],SAFE_RADIUS,0,6.29); ctx.stroke(); ctx.restore();
+  // walls
+  ctx.strokeStyle='#7d8597'; ctx.lineCap='round'; ctx.lineWidth=WALL_THICK;
+  for(const s of L.walls){ ctx.beginPath();ctx.moveTo(s[0][0],s[0][1]);ctx.lineTo(s[1][0],s[1][1]);ctx.stroke(); }
+  // exit
+  ctx.save(); ctx.fillStyle='#54e08a'; ctx.globalAlpha=.35;
+  ctx.beginPath(); ctx.arc(L.goal.pos[0],L.goal.pos[1],L.goal.radius,0,6.29); ctx.fill();
+  ctx.globalAlpha=1; ctx.strokeStyle='#7af0c8'; ctx.lineWidth=3*iz; ctx.stroke(); ctx.restore();
+  // pickups + enemies + start (reuse the game's sprites/icons)
+  for(const w of L.weapons.pickups){ if(WEAPONS[w.type]) drawIcon(w.pos[0],w.pos[1],WEAPONS[w.type].color,'▸'); }
+  for(const p of L.powerups){ if(POWERUPS[p.type]) drawIcon(p.pos[0],p.pos[1],POWERUPS[p.type].color,POWERUPS[p.type].sym); }
+  for(const e of L.enemies){ const spr=SPRITES[e.type]; if(spr) drawSprite(spr,e.pos[0],e.pos[1],Math.PI/2,((ENEMY_DEFS[e.type]||{r:15}).r)*2.7,0); }
+  drawSprite(SPRITES.player,L.player.start[0],L.player.start[1],-Math.PI/2,(L.player.radius||14)*2.9,0);
+  ctx.textAlign='center';
+  ctx.fillStyle='#5ad1ff'; ctx.font='bold '+(15*iz)+'px ui-monospace,monospace';
+  ctx.fillText('START',L.player.start[0],L.player.start[1]-(L.player.radius||14)*2.4);
+  ctx.fillStyle='#7af0c8'; ctx.fillText('EXIT',L.goal.pos[0],L.goal.pos[1]-L.goal.radius-8*iz);
+  // wall being drawn
+  if(ED.drag&&ED.drag.type==='wall'){ ctx.strokeStyle='#ffd24a'; ctx.lineWidth=WALL_THICK; ctx.globalAlpha=.75;
+    ctx.beginPath(); ctx.moveTo(ED.drag.ax,ED.drag.ay); ctx.lineTo(edSnap(ED.mouse.wx),edSnap(ED.mouse.wy)); ctx.stroke(); ctx.globalAlpha=1; }
+  // hover highlight (move / erase)
+  if(ED.hover){ const h=ED.hover;
+    if(h.kind==='wall'){ const s=L.walls[h.i]; if(s){ ctx.strokeStyle='#ff5a7a'; ctx.lineWidth=WALL_THICK+4*iz; ctx.globalAlpha=.55;
+      ctx.beginPath();ctx.moveTo(s[0][0],s[0][1]);ctx.lineTo(s[1][0],s[1][1]);ctx.stroke(); ctx.globalAlpha=1; } }
+    else if(h.pos){ ctx.strokeStyle=ED.tool==='erase'?'#ff5a7a':'#ffd24a'; ctx.lineWidth=2*iz;
+      ctx.beginPath(); ctx.arc(h.pos[0],h.pos[1],24*iz,0,6.29); ctx.stroke(); } }
+  ctx.restore();
+  // screen-space editor HUD
+  ctx.fillStyle='#0c0e16cc'; ctx.fillRect(10,10,300,44); ctx.strokeStyle='#232636'; ctx.strokeRect(10,10,300,44);
+  ctx.textAlign='left'; ctx.fillStyle='#5ad1ff'; ctx.font='12px ui-monospace,monospace';
+  ctx.fillText('TOOL: '+ED.tool,20,30);
+  ctx.fillStyle='#8a8fa3'; ctx.fillText('zoom '+Math.round(ED.zoom*100)+'%  ·  right-drag pan · wheel zoom',20,46);
+}
+
+/* ---- editor mouse + wheel (only active in edit mode) ---- */
+cv.addEventListener('contextmenu',e=>{ if(mode==='edit') e.preventDefault(); });
+cv.addEventListener('wheel',e=>{ if(mode!=='edit') return; e.preventDefault();
+  const m=edWorld(e), minZ=cv.width/ED.level.world*0.95;
+  ED.zoom=clamp(ED.zoom*(e.deltaY<0?1.15:1/1.15),minZ,3.5);
+  ED.cam.x=m.wx-m.sx/ED.zoom; ED.cam.y=m.wy-m.sy/ED.zoom; edClampCam();
+},{passive:false});
+cv.addEventListener('mousedown',e=>{ if(mode!=='edit') return;
+  const m=edWorld(e);
+  if(e.button===1||e.button===2){ ED.drag={type:'pan',sx:m.sx,sy:m.sy,cx:ED.cam.x,cy:ED.cam.y}; e.preventDefault(); return; }
+  if(e.button!==0) return;
+  const wx=edSnap(m.wx), wy=edSnap(m.wy), t=ED.tool;
+  if(t==='wall') ED.drag={type:'wall',ax:wx,ay:wy};
+  else if(t==='erase'){ const p=edPick(m); if(p) edErase(p); }
+  else if(t==='start'){ ED.level.player.start=[wx,wy]; edSync(); }
+  else if(t==='goal'){ ED.level.goal.pos=[wx,wy]; edSync(); }
+  else if(t==='pan'){ const p=edPick(m), mv=p&&edMoveTarget(p); if(mv) ED.drag={type:'move',mv}; else ED.drag={type:'pan',sx:m.sx,sy:m.sy,cx:ED.cam.x,cy:ED.cam.y}; }
+  else edPlace(t,wx,wy);
+});
+addEventListener('mousemove',e=>{ if(mode!=='edit') return;
+  const m=edWorld(e); ED.mouse={wx:m.wx,wy:m.wy};
+  if(ED.drag){
+    if(ED.drag.type==='pan'){ ED.cam.x=ED.drag.cx-(m.sx-ED.drag.sx)/ED.zoom; ED.cam.y=ED.drag.cy-(m.sy-ED.drag.sy)/ED.zoom; edClampCam(); }
+    else if(ED.drag.type==='move'){ ED.drag.mv(edSnap(m.wx),edSnap(m.wy)); edSync(); }
+  } else { ED.hover=(ED.tool==='pan'||ED.tool==='erase') ? edPick(m) : null; }
+});
+addEventListener('mouseup',e=>{ if(mode!=='edit'){ ED.drag=null; return; }
+  if(ED.drag&&ED.drag.type==='wall'){ const m=edWorld(e), bx=edSnap(m.wx), by=edSnap(m.wy);
+    if(Math.hypot(bx-ED.drag.ax,by-ED.drag.ay)>4){ ED.level.walls.push([[ED.drag.ax,ED.drag.ay],[bx,by]]); edSync(); } }
+  ED.drag=null;
+});
+
+/* ---- editor + share wiring ---- */
+document.querySelectorAll('.toolbtn').forEach(b=>{ b.onclick=()=>{ ED.tool=b.dataset.tool;
+  document.querySelectorAll('.toolbtn').forEach(x=>x.classList.toggle('active',x===b)); cv.focus(); }; });
+(document.querySelector('.toolbtn[data-tool="wall"]')||{}).className='toolbtn active';
+document.getElementById('edSnap').onchange=e=>{ ED.snap=e.target.checked; };
+document.getElementById('btnEdit').onclick=()=>{ mode==='play'?enterEditor():exitEditorPlay(); };
+document.getElementById('btnShare').onclick=shareLink;
+document.getElementById('btnTestPlay').onclick=exitEditorPlay;
+document.getElementById('btnExport').onclick=exportJSON;
+document.getElementById('btnNewBlank').onclick=newBlank;
+
 /* input */
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase(); keys[k]=true;
+  if(mode==='edit') return;                       // editor uses mouse tools, not game keys
   if(k==='escape' || k==='p') togglePause();
   if(k==='r') restart();
   if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
@@ -1006,10 +1287,12 @@ Now design a dungeon with this theme: <DESCRIBE YOUR THEME HERE, e.g. "a flooded
 
 /* ============================ BOOT ============================ */
 document.getElementById('json').value = JSON.stringify(SAMPLE,null,2);
-currentLevel = clampLevel(SAMPLE).level;
-newGame(currentLevel);
+if(!loadFromHash()){                              // a #lvl=... shared link wins if present
+  currentLevel = clampLevel(SAMPLE).level;
+  newGame(currentLevel);
+  setMsg('Sample dungeon loaded and running. WASD = move, ARROW KEYS = aim & shoot. Click ✎ EDIT LEVEL to build your own, or ⧉ SHARE LINK to share it.','ok');
+}
 updatePauseBtn();
-setMsg('Sample dungeon loaded and running. WASD = move, ARROW KEYS = aim & shoot. Press Esc to pause (this panel is the pause menu). The portal is heavily guarded — gear up first!','ok');
 requestAnimationFrame(loop);
 </script>
 </body>
