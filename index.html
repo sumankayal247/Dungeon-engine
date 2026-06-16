@@ -206,6 +206,10 @@
         <button class="toolbtn" data-tool="enemy:sentry">Sentry</button>
         <button class="toolbtn" data-tool="enemy:turret">Turret</button>
         <button class="toolbtn" data-tool="enemy:mage">Mage</button>
+        <button class="toolbtn" data-tool="enemy:bomber">Bomber</button>
+        <button class="toolbtn" data-tool="enemy:splitter">Splitter</button>
+        <button class="toolbtn" data-tool="enemy:dasher">Dasher</button>
+        <button class="toolbtn" data-tool="enemy:boss">Boss</button>
       </div>
       <div class="edsec">WEAPONS</div>
       <div class="toolgrid">
@@ -341,6 +345,11 @@ const ENEMY_DEFS = {
   sentry: {hp:30,  speed:0,   behavior:'static',dmg:9,  ranged:true,  sight:560, color:'#ffce5a', r:15},
   turret: {hp:60,  speed:0,   behavior:'static',dmg:14, ranged:true,  sight:640, color:'#ff5a7a', r:18},
   mage:   {hp:35,  speed:70,  behavior:'patrol',dmg:12, ranged:true,  sight:520, color:'#5affd2', r:15},
+  // ---- special-behaviour enemies (flagged by `kind`) ----
+  bomber:  {hp:24, speed:135, behavior:'chase', dmg:12, ranged:false, sight:520, color:'#ff8a3a', r:14, kind:'bomber'},   // rushes in, then explodes
+  splitter:{hp:80, speed:70,  behavior:'chase', dmg:12, ranged:false, sight:460, color:'#7bd86a', r:20, kind:'splitter'}, // bursts into 5 babies on death
+  dasher:  {hp:34, speed:60,  behavior:'chase', dmg:16, ranged:false, sight:660, color:'#a9ecff', r:14, kind:'dasher'},   // lunges at random intervals
+  boss:    {hp:600,speed:42,  behavior:'chase', dmg:18, ranged:true,  sight:780, color:'#c45aff', r:34, kind:'boss'},     // spray-fires; place near the exit
 };
 const POWERUPS = {
   health: {color:'#54e08a', sym:'+',  defVal:30},
@@ -362,6 +371,8 @@ const PAL = {
   W:'#eef3ff', Y:'#ffce5a',                      // sentry eye
   M:'#9aa3b2', m:'#4a4f5e', T:'#ff5a7a',         // turret
   A:'#5affd2', a:'#2fae8a',                       // mage
+  N:'#33384a', F:'#ff8a3a',                       // bomber (dark body, fuse)
+  J:'#7bd86a', j:'#4e9e44',                       // splitter
   E:'#fff3b0', X:'#1a0e14',                       // eyes / pupils (shared)
 };
 const SPR_DATA = {
@@ -406,6 +417,30 @@ const SPR_DATA = {
     "....KAAAAAAK....","...KAAXXXXAAK...","...KAXEEEEXAK...","...KAXEEEEXAK...",
     "...KAAXXXXAAK...","..KAAAAAAAAAAK..","..KAAAAAAAAAAK..",".KAAAAAAAAAAAAK.",
     ".KAAAaaaaaaAAAK.",".KAAAAAAAAAAAAK.","..KKKKKKKKKKKK..","................",
+  ],
+  bomber: [
+    "................",".......FF.......",".......NF.......","......KKKK......",
+    "....KKNNNNKK....","...KNNNNNNNNK...","..KNNEENNEENNK..","..KNNXXNNXXNNK..",
+    "..KNNNNNNNNNNK..",".KNNNNNNNNNNNNK.",".KNNNNMMMMNNNNK.",".KNNNNNNNNNNNNK.",
+    "..KNNNNNNNNNNK..","...KNNNNNNNNK...","....KKKKKKKK....","................",
+  ],
+  splitter: [
+    "................","....J..J..J.....","...KKKKKKKKK....","..KJJJJJJJJJJK..",
+    ".KJJJJJJJJJJJJK.",".KJEJJJEJJJEJJK.",".KJXJJJXJJJXJJK.",".KJJJJJJJJJJJJK.",
+    ".KJJJjjjjjjJJJK.",".KJJJJJJJJJJJJK.","..KJJJJJJJJJJK..","..KJJJJJJJJJJK..",
+    "...KJJJJJJJJK...","....KJJJJJJK....","......KKKK......","................",
+  ],
+  dasher: [
+    ".......KK.......","......KBBK......","......KBBK......",".....KBCCBK.....",
+    ".....KBCCBK.....","....KBBBBBBK....","....KBBBBBBK....","...KBBBBBBBBK...",
+    "...KBBBBBBBBK...","..KBBBBBBBBBBK..","..KBBKBBBBKBBK..",".KBBK.KBBK.KBBK.",
+    ".KBK...KK...KBK.",".KK.........KK..","................","................",
+  ],
+  boss: [
+    "..K..........K..","..KK........KK..",".KPPK......KPPK.",".KPPPKKKKKKPPPK.",
+    "KPPPPPPPPPPPPPPK","KPPPPPPPPPPPPPPK","KPTTPPPPPPPPTTPK","KPTXTPPPPPPTXTPK",
+    "KPTTPPPPPPPPTTPK","KPPPPPPPPPPPPPPK","KPPPKKKKKKKKPPPK","KPPKWKWKWKWKKPPK",
+    "KPPPKKKKKKKKPPPK",".KPPPPPPPPPPPPK.","..KPPPPPPPPPPK..","...KKKKKKKKKK...",
   ],
 };
 // Bake each grid into an offscreen canvas (texture + a white silhouette for hit-flash).
@@ -479,23 +514,24 @@ const SAMPLE = {
   ],
   enemies: [
     // --- lighter enemies spread across the map (explore to clear / grab loot) ---
-    {type:"grunt",  pos:[820,820]},
-    {type:"runner", pos:[1750,620]},
-    {type:"grunt",  pos:[620,2000]},
-    {type:"turret", pos:[2000,2000]},
-    {type:"runner", pos:[820,3200]},
-    {type:"mage",   pos:[2000,3400], behavior:"patrol", path:[[2000,3400],[1500,3400],[1500,3800],[2000,3800]]},
-    {type:"grunt",  pos:[3500,820]},
-    {type:"runner", pos:[3600,2000]},
+    {type:"grunt",   pos:[820,820]},
+    {type:"runner",  pos:[1750,620]},
+    {type:"bomber",  pos:[1000,360]},                       // surprise exploder
+    {type:"grunt",   pos:[620,2000]},
+    {type:"turret",  pos:[2000,2000]},
+    {type:"splitter",pos:[1100,1500]},                      // bursts into babies
+    {type:"runner",  pos:[820,3200]},
+    {type:"mage",    pos:[2000,3400], behavior:"patrol", path:[[2000,3400],[1500,3400],[1500,3800],[2000,3800]]},
+    {type:"dasher",  pos:[3500,820]},                       // lunges from the side room
+    {type:"runner",  pos:[3600,2000]},
     // --- PORTAL GUARDIANS: dense + powerful, blocking the bottom-right exit ---
-    {type:"brute",  pos:[3030,2860]},                       // guards the north door
-    {type:"brute",  pos:[2860,3430]},                       // guards the west door
-    {type:"turret", pos:[3000,3000]},
-    {type:"turret", pos:[3850,3000]},
-    {type:"sentry", pos:[3650,3250]},
-    {type:"runner", pos:[3350,3650]},
-    {type:"runner", pos:[3950,3650]},
-    {type:"brute",  pos:[3650,3850], hp:420, speed:48, damage:36}  // the WARDEN — boss by the portal
+    {type:"brute",   pos:[3030,2860]},                      // guards the north door
+    {type:"dasher",  pos:[2860,3430]},                      // guards the west door
+    {type:"turret",  pos:[3000,3000]},
+    {type:"bomber",  pos:[3850,3000]},
+    {type:"sentry",  pos:[3650,3250]},
+    {type:"splitter",pos:[3350,3650]},
+    {type:"boss",    pos:[3700,3820]}                       // THE WARDEN — spray-firing boss by the portal
   ]
 };
 
@@ -688,12 +724,14 @@ function newGame(L){
       x:e.pos[0], y:e.pos[1], r:e.def.r, hp:e.hp, maxhp:e.hp, speed:e.speed,
       behavior:e.behavior, ranged:e.ranged, dmg:e.dmg, sight:e.sight, def:e.def, type:e.type,
       path:e.path, wp:0, cd:(i*0.37)%1.3, aggro:false, lastSeen:[e.pos[0],e.pos[1]],
-      face:Math.PI/2, touchCd:0, hitFlash:0, dead:false
+      face:Math.PI/2, touchCd:0, hitFlash:0, dead:false,
+      kind:e.def.kind||null, dashCd:1.2+Math.random()*2, dashing:0, windup:0, dashDir:0
     })),
     powerups:L.powerups.map(p=>({ ...p, taken:false })),
     weaponPickups:L.weaponPickups.map(p=>({ ...p, taken:false })),
     particles:[],
     floats:[],
+    spawns:[],          // enemies queued to add after the update loop (splitter babies)
     shake:0,
     time:0,
     cam:{ x:clamp(L.player.start[0]-VIEWPORT/2,0,WORLD-VIEWPORT),
@@ -813,7 +851,19 @@ function update(dt){
     const canSee = toP < e.sight && lineOfSight(e.x,e.y,P.x,P.y);
     if(canSee){ e.aggro=true; e.lastSeen[0]=P.x; e.lastSeen[1]=P.y; }
 
-    if(e.aggro && e.speed>0){
+    // BOMBER: detonate the instant it reaches the player
+    if(e.kind==='bomber' && toP < e.r+P.r+18){ detonate(e); continue; }
+
+    if(e.kind==='dasher'){
+      // creep slowly, then LUNGE at the player at random intervals
+      if(e.dashing>0){ e.dashing-=dt; moveEntity(e, Math.cos(e.dashDir)*560*dt, Math.sin(e.dashDir)*560*dt); }
+      else if(e.windup>0){ e.windup-=dt; e.hitFlash=0.08; if(e.windup<=0) e.dashing=0.32; }   // wind-up flash
+      else if(e.aggro){
+        e.dashCd-=dt;
+        if(canSee && e.dashCd<=0){ e.windup=0.28; e.dashDir=Math.atan2(P.y-e.y,P.x-e.x); e.dashCd=1.4+Math.random()*1.8; }
+        else chaseToward(e, e.lastSeen[0], e.lastSeen[1], dt);   // e.speed is low → slow creep
+      }
+    } else if(e.aggro && e.speed>0){
       // chase the last place the player was seen; give up once we get there blind
       const dl=Math.hypot(e.lastSeen[0]-e.x, e.lastSeen[1]-e.y);
       if(dl>6) chaseToward(e, e.lastSeen[0], e.lastSeen[1], dt);
@@ -830,10 +880,16 @@ function update(dt){
     if(e.ranged){
       e.cd-=dt;
       if(e.cd<=0 && canSee){
-        e.cd=1.3;
-        const a=Math.atan2(P.y-e.y,P.x-e.x);
-        G.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*360,vy:Math.sin(a)*360,
-          dmg:e.dmg,team:'enemy',r:6,life:3,color:e.def.color});
+        const a0=Math.atan2(P.y-e.y,P.x-e.x);
+        if(e.kind==='boss'){               // BOSS: spray a fan of bullets
+          e.cd=1.9;
+          for(let kk=-4;kk<=4;kk++){ const a=a0+kk*0.16;
+            G.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*340,vy:Math.sin(a)*340,dmg:e.dmg,team:'enemy',r:7,life:3.6,color:e.def.color}); }
+          SFX.shoot('smg');
+        } else {
+          e.cd=1.3;
+          G.bullets.push({x:e.x,y:e.y,vx:Math.cos(a0)*360,vy:Math.sin(a0)*360,dmg:e.dmg,team:'enemy',r:6,life:3,color:e.def.color});
+        }
       }
     }
     // contact damage
@@ -867,8 +923,15 @@ function update(dt){
         if(Math.hypot(b.x-e.x,b.y-e.y) < e.r+b.r){
           e.hp-=b.dmg; e.hitFlash=0.1; burst(b.x,b.y,e.def.color); SFX.hit();
           if(!b.pierce) b.dead=true;
-          if(e.hp<=0){ e.dead=true; const big=e.r>18;
-            explode(e.x,e.y,e.def.color, big?28:16, 260); addShake(big?10:5); SFX.death(); }
+          if(e.hp<=0){
+            if(e.kind==='bomber'){ detonate(e); }            // shooting a bomber still sets off its blast
+            else {
+              e.dead=true; const big=e.r>18;
+              explode(e.x,e.y,e.def.color, big?28:16, 260); addShake(big?10:5); SFX.death();
+              if(e.kind==='splitter') spawnBabies(e);          // burst into 5 babies
+              if(e.kind==='boss'){ addShake(24); toast('⚔ Boss defeated!','ok',3000); }
+            }
+          }
           if(!b.pierce) break;
         }
       }
@@ -877,6 +940,9 @@ function update(dt){
     }
   }
   G.bullets = G.bullets.filter(b=>!b.dead);
+
+  // ---- add any queued spawns (splitter babies) ----
+  if(G.spawns.length){ G.enemies.push(...G.spawns); G.spawns.length=0; }
 
   // ---- particles ----
   for(const pp of G.particles){ pp.x+=pp.vx*dt; pp.y+=pp.vy*dt; pp.life-=dt; }
@@ -947,6 +1013,24 @@ function tabTip(){
   if(tabTipShown) return;
   tabTipShown=true; try{ localStorage.setItem('de_tabtip','1'); }catch(e){}
   toast('New weapon! Press TAB to switch weapons.', 'ok', 3800);
+}
+// bomber: AOE blast that hurts the player within radius (with falloff)
+function detonate(e){
+  if(e.dead) return; e.dead=true;
+  explode(e.x,e.y,'#ff8a3a',32,400); addShake(15); SFX.death();
+  const R=150, d=Math.hypot(G.player.x-e.x, G.player.y-e.y);
+  if(d<R) hurtPlayer(Math.round(42*(1-d/R)));
+}
+// splitter: queue 5 small fast "babies" (added after the update loop)
+function spawnBabies(e){
+  for(let i=0;i<5;i++){
+    const a=(i/5)*6.283+Math.random();
+    G.spawns.push({ x:e.x+Math.cos(a)*e.r, y:e.y+Math.sin(a)*e.r, r:9, hp:10, maxhp:10, speed:150,
+      behavior:'chase', ranged:false, dmg:6, sight:560, type:'splitter',
+      def:{ ...ENEMY_DEFS.splitter, r:9 }, path:null, wp:0, cd:0, aggro:true,
+      lastSeen:[G.player.x,G.player.y], face:a, touchCd:0, hitFlash:0, dead:false,
+      kind:null, dashCd:0, dashing:0, windup:0, dashDir:0 });   // kind:null → babies don't split again
+  }
 }
 
 /* ============================ RENDER ============================ */
@@ -1463,7 +1547,11 @@ SCHEMA:
 ALLOWED VALUES (use these exact strings only):
 - weapon  : "pistol", "smg", "shotgun", "sniper"
 - powerup : "health", "shield", "speed", "damage", "ammo"
-- enemy   : "grunt", "runner", "brute", "sentry", "turret", "mage"
+- enemy   : "grunt", "runner", "brute", "sentry", "turret", "mage",
+            "bomber"  (rushes in and EXPLODES on contact),
+            "splitter"(bursts into 5 small babies when killed),
+            "dasher"  (lunges at you at random intervals),
+            "boss"    (big; SPRAY-fires a fan of bullets — place 1 near the exit)
 - behavior: "chase", "patrol", "static"   ("patrol" requires a "path" array of waypoints)
 
 RULES:
@@ -1478,9 +1566,10 @@ RULES:
    opening (gap >= 150 wide). This is the player's healing safe zone. Keep it clear of enemies.
 4. Put "player.start" (top-left-ish) and "goal.pos" (far away, e.g. bottom-right) far apart,
    both in OPEN space, not inside a wall.
-5. GUARD THE PORTAL: cluster your STRONGEST and MOST enemies (brutes, turrets, a high-"hp" boss
-   brute) in and around the goal so the player cannot just rush it. Spread weaker enemies, weapon
-   pickups and powerups across the OTHER rooms so the player must EXPLORE and gear up before the exit.
+5. GUARD THE PORTAL: place ONE "boss" plus a cluster of strong enemies (brutes, turrets, dashers)
+   around the goal so the player cannot just rush it. Sprinkle "bomber"/"splitter"/"dasher" enemies
+   as nasty surprises elsewhere. Spread weaker enemies, weapon pickups and powerups across the OTHER
+   rooms so the player must EXPLORE and gear up before the exit.
 6. Use 12-20 enemies total across this big map, 3 weapon pickups, and 5-8 powerups.
    Enemies stay dormant until the player comes within their sight, so place some as ambushes.
 7. OPTIONAL per-enemy overrides: "hp", "speed", "damage", "ranged", "sight". Omit them to use the

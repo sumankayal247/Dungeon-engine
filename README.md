@@ -113,7 +113,7 @@ A level is just one JSON object. The world is `4000 × 4000`, and every position
 |----------|---------|
 | **Weapons** | `pistol` · `smg` · `shotgun` · `sniper` |
 | **Powerups** | `health` · `shield` · `speed` · `damage` · `ammo` |
-| **Enemies** | `grunt` · `runner` · `brute` · `sentry` · `turret` · `mage` |
+| **Enemies** | `grunt` · `runner` · `brute` · `sentry` · `turret` · `mage` · `bomber` (explodes on contact) · `splitter` (bursts into 5 babies) · `dasher` (lunges at you) · `boss` (spray-fires; put near the exit) |
 | **Behaviors** | `chase` · `patrol` (needs a `path`) · `static` |
 
 **Weapons at a glance:**
