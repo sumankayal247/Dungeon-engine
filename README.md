@@ -1,25 +1,25 @@
 # 🏰 DUNGEON ENGINE
 
-A **browser-based, data-driven dungeon shooter** that turns a single JSON description into a fully playable top-down game — walls, weapons, powerups, enemies, a safe room, and a guarded exit portal.
+Hey, welcome! 👋 This is a little game I built — a **top-down dungeon shooter that you design with AI**. Describe a dungeon to any chatbot, paste what it gives you, and play it instantly in your browser. No installs, no sign-ups, no nonsense.
 
-The twist: **the engine has no AI inside it.** Instead it ships a fixed prompt you can hand to *any* AI (ChatGPT, Claude, Gemini, …). The AI returns level data in the engine's format, you paste it in, and the engine builds and runs the game. You design dungeons by describing them in plain English.
+## ▶️ [**Click here to play it now →**](https://sumankayal247.github.io/Dungeon-engine/)
 
-- ⚙️ **Pure code, zero dependencies** — one self-contained `index.html` (HTML + Canvas + vanilla JS). No build step, no frameworks, no backend, no assets.
-- 🎮 **Plays instantly** — open the file (or the live page) and a sample dungeon is already running.
-- 🧱 **Coordinate-based levels** in a `4000 × 4000` world with a camera that follows the player.
-- 👾 **Hand-made pixel sprites** for the player and every monster, drawn procedurally in code.
+Runs right in your browser. A sample dungeon is already loaded, so you can jump straight in.
 
 ---
 
-## ▶️ Play it live
+## What is this?
 
-If you deploy this repo to **GitHub Pages** (instructions below), it will be playable at:
+I wanted a game where the *levels* come from your imagination. So DUNGEON ENGINE doesn't have any AI baked into it — instead it comes with a ready-made prompt you can hand to **any** AI (ChatGPT, Claude, Gemini, whatever you like). You describe a dungeon in plain English, the AI writes the level data, you paste it in, and the engine builds and runs it.
 
-```
-https://<your-username>.github.io/<repo-name>/
-```
+It's all **pure code in a single file** — HTML5 Canvas and vanilla JavaScript, zero dependencies, no backend. The whole thing is just `index.html`, which means it loads fast and works offline too.
 
-Or just download `index.html` and open it in any modern browser — it runs entirely offline.
+A few things I'm happy with:
+- 🧱 Big `4000 × 4000` worlds with a camera that follows you
+- 👾 Hand-made pixel sprites for the player and every monster, drawn entirely in code
+- 🧠 Enemies that stay dormant until they actually spot you
+- 🩹 A safe room you can retreat to and heal
+- 🌀 A glowing exit portal — guarded, so you'll need to gear up first
 
 ---
 
@@ -30,34 +30,34 @@ Or just download `index.html` and open it in any modern browser — it runs enti
 | **W A S D** | Move (hold two keys for diagonals) |
 | **Arrow keys** | Aim **and** shoot in that direction (hold two to aim diagonally) |
 | **Space** | Fire in your last aim direction |
-| **Esc** / **P** | Pause (opens the side panel — it's your pause menu) |
-| **R** | Restart the current dungeon |
+| **Esc** / **P** | Pause (this also opens the side menu) |
+| **R** | Restart the dungeon |
 
-**Goal:** Fight your way to the glowing **portal** and step through it to escape.
-The portal is heavily guarded, so **explore the map and collect weapons & powerups** before you make your run.
+**Your goal:** fight your way to the glowing **portal** and step through it to escape. It's heavily guarded, so explore the map and grab weapons and powerups before you make your run.
 
-**Tips**
-- The **green SAFE zone** at your start regenerates HP — retreat there when you're low.
-- Enemies are **dormant until they spot you** (they need line-of-sight within their vision range), so you can sneak and pick fights on your terms.
-- When a weapon runs out of ammo you automatically fall back to the infinite pistol.
-
----
-
-## 🤖 Designing your own dungeons (with any AI)
-
-1. Click **⧉ COPY AI PROMPT** in the side panel (or open [`AI_PROMPT.txt`](AI_PROMPT.txt)).
-2. Paste it into any AI chat and replace the last line with your theme, e.g.
-   *"a flooded prison with sniper towers and a flooded central courtyard."*
-3. The AI returns a single JSON object.
-4. Paste it into the text box and hit **▶ BUILD & PLAY**.
-
-The engine validates and sanitizes everything: unknown values are skipped with a warning, numbers are clamped to safe ranges, and a flood-fill check warns you if the exit is accidentally walled off.
+A few tips:
+- The **green SAFE zone** where you start slowly heals you — duck back there when you're low.
+- Enemies won't notice you until you're in their line of sight, so you can sneak around and pick your fights.
+- If a weapon runs out of ammo, you'll automatically switch back to your trusty infinite pistol.
 
 ---
 
-## 📦 Level format
+## 🤖 Make your own dungeons
 
-A level is one JSON object. The world is a `4000 × 4000` grid; every position is `[x, y]`.
+This is the fun part:
+
+1. Hit **⧉ COPY AI PROMPT** in the side panel.
+2. Paste it into any AI chat and tell it your theme — something like *"a flooded prison with sniper towers and a crumbling courtyard."*
+3. Copy the JSON it gives back.
+4. Paste it into the box and hit **▶ BUILD & PLAY**.
+
+That's it — your dungeon comes to life. The engine checks everything you paste, fixes anything out of range, and even warns you if the exit accidentally got walled off.
+
+---
+
+## 📦 For the curious — the level format
+
+A level is just one JSON object. The world is `4000 × 4000`, and every position is `[x, y]`.
 
 ```jsonc
 {
@@ -90,86 +90,52 @@ A level is one JSON object. The world is a `4000 × 4000` grid; every position i
 }
 ```
 
-### Allowed values (use these exact strings)
+**The pieces you can use:**
 
-| Category | Values |
-|----------|--------|
+| Category | Options |
+|----------|---------|
 | **Weapons** | `pistol` · `smg` · `shotgun` · `sniper` |
 | **Powerups** | `health` · `shield` · `speed` · `damage` · `ammo` |
 | **Enemies** | `grunt` · `runner` · `brute` · `sentry` · `turret` · `mage` |
 | **Behaviors** | `chase` · `patrol` (needs a `path`) · `static` |
 
-### Weapons
+**Weapons at a glance:**
 
 | Weapon | Damage | Fire rate | Ammo | Notes |
 |--------|-------:|-----------|-----:|-------|
-| Pistol | 18 | medium | ∞ | Starting weapon |
+| Pistol | 18 | medium | ∞ | Your starter |
 | SMG | 10 | very fast | 140 | Slight spread |
 | Shotgun | 9 ×8 | slow | 28 | Wide pellet spread |
 | Sniper | 75 | slow | 10 | Fast bullet, **pierces** enemies |
 
-### Powerups
+**Powerups:**
 
 | Powerup | Effect |
 |---------|--------|
-| Health | Restores HP (`value`, default 30) |
-| Shield | Adds damage-absorbing shield (default 50, caps at 150) |
-| Speed | ~1.7× move speed for a few seconds |
+| Health | Restores HP |
+| Shield | Adds a damage-absorbing shield |
+| Speed | Move faster for a few seconds |
 | Damage | Double damage for a few seconds |
-| Ammo | Refills the current weapon |
+| Ammo | Refills your current weapon |
 
-Per-enemy fields `hp`, `speed`, `damage`, `ranged`, `sight`, and `path` are **optional overrides** — omit them to use each enemy type's defaults.
-
----
-
-## ⚙️ Side-panel settings (QoL)
-
-- **Pause / Restart** buttons
-- Toggle **minimap**, **background grid**, **pickup popups**, **FPS counter**
-- **Invincible (test mode)** — for trying out levels without dying
+The per-enemy fields like `hp`, `speed`, `damage`, `sight`, and `path` are all optional — leave them out and each enemy uses sensible defaults.
 
 ---
 
-## 🚀 Deploy to GitHub Pages
+## ⚙️ Handy extras
 
-Because it's a single static file, hosting is trivial:
-
-1. Push this folder to a GitHub repository.
-2. Go to **Settings → Pages**.
-3. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-4. Select branch **`main`** and folder **`/ (root)`**, then **Save**.
-5. Wait ~1 minute — your game is live at `https://<your-username>.github.io/<repo-name>/`.
-
-> `index.html` is at the repo root, so GitHub Pages serves it as the homepage automatically.
+The side panel has a few quality-of-life toggles: minimap, background grid, pickup popups, an FPS counter, and an invincible "test mode" for when you just want to wander a level you're designing.
 
 ---
 
-## 📁 Project structure
+## 🛠️ Under the hood
 
-```
-dungeon-engine/
-├── index.html      # the entire engine + renderer + sample level (open this)
-├── AI_PROMPT.txt   # the prompt to give any AI to generate levels
-├── README.md
-└── LICENSE         # MIT
-```
+Plain HTML5 Canvas and vanilla JavaScript — no libraries, no build step. The pixel sprites are defined as little character grids and drawn into the canvas at load. Everything you paste is parsed safely (`JSON.parse` only, never `eval`), so it's fine to try levels from anywhere.
 
 ---
 
-## 🔒 Notes on safety
-
-Level data is parsed with `JSON.parse` only (**never `eval`**), every field is type-checked and clamped, and all text is rendered with `textContent` (no HTML injection). The game makes no network requests and stores nothing — it's safe to run untrusted level JSON.
-
----
-
-## 🛠️ Tech
-
-Plain HTML5 Canvas + vanilla JavaScript. No libraries, no build tooling. Pixel sprites are defined as character grids and baked into offscreen canvases at load.
-
-Made for fun — fork it, tweak the catalogs, and design your own dungeons. 🗡️
-
----
+Thanks for stopping by — I hope you have fun with it! Feel free to fork it, tinker with it, and build your own dungeons. 🗡️
 
 ## 📄 License
 
-Released under the [MIT License](LICENSE) — free to use, modify, and distribute.
+Released under the [MIT License](LICENSE) — do whatever you like with it.
