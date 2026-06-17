@@ -26,7 +26,7 @@
   /* ---- Side panel (editor) ---- */
   #side{width:380px;min-width:340px;background:var(--panel);border-right:1px solid var(--line);
     display:flex;flex-direction:column;padding:14px;gap:10px;overflow:auto;
-    transition:margin-left .28s ease, opacity .22s ease}
+    transition:margin-left .28s ease, transform .28s ease, opacity .22s ease}
   #side.collapsed{margin-left:-402px;opacity:0;pointer-events:none}
   .setlabel{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;
     padding:4px 0;cursor:pointer}
@@ -151,6 +151,30 @@
     border:5px solid transparent;border-top-color:var(--line)}
   #tip.below{transform:translate(-50%,0)}
   #tip.below::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--line)}
+  #pmLevels{display:none} #sideClose{display:none}    /* mobile-only controls */
+  /* ============ MOBILE / narrow screens ============ */
+  @media (max-width:680px){
+    /* sidebar becomes an overlay drawer so the stage stays full-width & centered */
+    #side{position:absolute;top:0;bottom:0;left:0;z-index:25;width:88%;max-width:340px;
+      box-shadow:0 0 50px #000b}
+    #side.collapsed{margin-left:0;transform:translateX(-105%);opacity:1}
+    #pmLevels{display:block}
+    #sideClose{display:flex;position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;
+      align-items:center;justify-content:center}
+    /* declutter the top bar */
+    #levelTitle{display:none!important}            /* the cinematic intro card still announces the name */
+    #hud{top:10px;left:10px;right:auto;gap:6px;flex-wrap:wrap;max-width:60%}
+    .pill{font-size:11px;padding:5px 8px}
+    #hpbar{width:108px}
+    #topRight{top:10px;right:10px;gap:6px}
+    .iconbtn{padding:7px 10px;font-size:12px}
+    #pauseMenu button{width:84%;max-width:300px}
+    .pm-title{font-size:28px}
+    .stick{width:120px;height:120px;bottom:18px}
+    #stickL{left:18px} #stickR{right:18px}
+    .knob{width:50px;height:50px;margin:-25px 0 0 -25px}
+    #titleCard span{font-size:13vw;letter-spacing:5px}
+  }
   /* ---- mobile touch sticks ---- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none;z-index:5}
   body.touch #touch{display:block}
@@ -166,6 +190,7 @@
 <body>
 <div id="app">
   <aside id="side" class="collapsed">
+    <button class="iconbtn" id="sideClose">✕</button>
     <h1>DUNGEON <span>ENGINE</span></h1>
     <div class="sub">Paste a level and hit <b>Build &amp; Play</b>, or design one with the visual
       <b>Edit</b> tool (top-right). No JSON? Copy the level prompt and ask any AI.</div>
@@ -211,6 +236,7 @@
       <div class="pm-title">Paused</div>
       <button class="primary" id="pmResume">▶ Resume</button>
       <button id="pmRestart">↻ Restart</button>
+      <button id="pmLevels">🧩 Build / Levels</button>
       <button id="pmSample">⤓ Load Sample</button>
       <button id="pmShare">⧉ Share / Copy Link</button>
       <button id="pmSettings">⚙ Settings</button>
@@ -1246,11 +1272,13 @@ function openModal(which){ document.querySelectorAll('.mc').forEach(m=>m.classLi
 function closeModal(){ document.getElementById('modal').classList.remove('on'); }
 function modalOpen(){ return document.getElementById('modal').classList.contains('on'); }
 
-/* ---- pause: centered menu (center) + level panel (left) both appear ---- */
+/* ---- pause: centered menu (center) + level panel (left) ---- */
+const isMobile=()=>matchMedia('(max-width:680px)').matches;
 function setSidebar(hide){ document.getElementById('side').classList.toggle('collapsed', hide); }
 function showPause(on){
   document.getElementById('pauseMenu').classList.toggle('on', on);
-  setSidebar(!on);                       // left panel visible only while paused
+  // desktop: show the level panel alongside the menu. mobile: keep it as an on-demand drawer.
+  setSidebar(isMobile() ? true : !on);
   if(!on) closeModal();
 }
 function togglePause(){
@@ -1296,6 +1324,8 @@ document.getElementById('btnGenerate').onclick=()=>{
 };
 document.getElementById('pmResume').onclick=togglePause;
 document.getElementById('pmRestart').onclick=restart;
+document.getElementById('pmLevels').onclick=()=>setSidebar(false);   // open the drawer over the menu (mobile)
+document.getElementById('sideClose').onclick=()=>setSidebar(true);   // close the drawer
 document.getElementById('pmSample').onclick=loadSample;
 document.getElementById('pmShare').onclick=()=>shareLink();
 document.getElementById('pmSettings').onclick=()=>openModal('Settings');
