@@ -17,8 +17,8 @@ jobs:
           response=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST \
             "${SUPABASE_URL}/rest/v1/rpc/keep_alive" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}" \
             -H "Content-Type: application/json")
 
           echo "Supabase response: $response"
